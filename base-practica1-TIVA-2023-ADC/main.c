@@ -43,9 +43,14 @@
 #define ADC_TASK_STACK (256)
 #define ADC_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 
+#define ESTADOS_TASK_STACK (256)
+#define ESTADOS_TASK_PRIORITY (tskIDLE_PRIORITY+1)
+
 //Globales
 uint32_t g_ui32CPUUsage;
 uint32_t g_ulSystemClock;
+
+QueueHandle_t cola_estados;
 
 //*****************************************************************************
 //
@@ -147,6 +152,19 @@ static portTASK_FUNCTION(ADCTask,pvParameters)
     }
 }
 
+static portTASK_FUNCTION(STATE_SWITCHESTask,pvParameters)
+{
+    MESSAGE_INTERRUPT_PARAMETER parameter;
+
+    //
+    // Bucle infinito, las tareas en FreeRTOS no pueden "acabar", deben "matarse" con la funcion xTaskDelete().
+    //
+    while(1)
+    {
+        xQueueReceive(cola_estados,&parameter,portMAX_DELAY);
+        remotelink_sendMessage(MESSAGE_SWITCHES_INTERRUPT,(void *)&parameter,sizeof(parameter));
+    }
+}
 
 //Funcion callback que procesa los mensajes recibidos desde el PC (ejecuta las acciones correspondientes a las ordenes recibidas)
 static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t parameterSize)
@@ -245,6 +263,19 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
             status=remotelink_sendMessage(MESSAGE_SWITCHES_POLL,(void *)&parametro,sizeof(parametro));
         }
         break;
+        case MESSAGE_SWITCHES_INTERRUPT:
+        {
+            GPIOIntTypeSet(GPIO_PORTF_BASE, ALL_BUTTONS,GPIO_BOTH_EDGES);
+            IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);
+            GPIOIntEnable(GPIO_PORTF_BASE,ALL_BUTTONS);
+            IntEnable(INT_GPIOF);
+        }
+        break;
+        case MESSAGE_SWITCHES_INTERRUPT_DISABLE:
+        {
+            IntDisable(INT_GPIOF);
+        }
+        break;
        default:
            //mensaje desconocido/no implementado
            status=PROT_ERROR_UNIMPLEMENTED_COMMAND; //Devuelve error.
@@ -295,6 +326,12 @@ int main(void)
 	 //Inicializa los botones (tambien en el puerto F) y habilita sus interrupciones
 	ButtonsInit();  // <----------
 
+
+	if ((cola_estados = xQueueCreate(20, sizeof(MESSAGE_INTERRUPT_PARAMETER))) == NULL)
+	{
+	    while(1);
+	}
+
 	/********************************      Creacion de tareas *********************/
 
 	//Tarea del interprete de comandos (commands.c)
@@ -318,6 +355,12 @@ int main(void)
         while(1);
     }
 
+    // Control asíncrono mediante eventos de entradas digitales
+    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"ESTADO INT", ESTADOS_TASK_STACK,NULL,ESTADOS_TASK_PRIORITY, NULL) != pdTRUE))
+    {
+        while(1);
+    }
+
 
 	//
 	// Arranca el  scheduler.  Pasamos a ejecutar las tareas que se hayan activado.
@@ -329,5 +372,21 @@ int main(void)
 	{
 		//Si llego aqui es que algo raro ha pasado
 	}
+}
+
+
+void GPIOFIntHandler(void)
+{
+    BaseType_t higherPriorityTaskWoken=pdFALSE;
+    MESSAGE_INTERRUPT_PARAMETER parametro;
+    int32_t i32PinStatus = GPIOPinRead(GPIO_PORTF_BASE,ALL_BUTTONS);
+
+    parametro.sw1 = !(i32PinStatus & LEFT_BUTTON);
+    parametro.sw2 = !(i32PinStatus & RIGHT_BUTTON);
+
+    xQueueSendFromISR(cola_estados, &parametro, &higherPriorityTaskWoken);
+
+    GPIOIntClear(GPIO_PORTF_BASE,ALL_BUTTONS);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 

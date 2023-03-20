@@ -86,6 +86,10 @@ void MainUserGUI::on_runButton_clicked()
 {
     //Intenta arrancar la comunicacion con la TIVA
     tiva.startRemoteLink( ui->serialPortComboBox->currentText());
+
+    // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    cambiaMODO();
+    modoSwitches();
 }
 
 
@@ -130,10 +134,12 @@ void MainUserGUI::modoSwitches()
     if (ui->sondeo->isChecked())
     {
         ui->estado->setHidden(false);
+        tiva.sendMessage(MESSAGE_SWITCHES_INTERRUPT_DISABLE,NULL,0);
     }
     else
     {
         ui->estado->setHidden(true);
+        tiva.sendMessage(MESSAGE_SWITCHES_INTERRUPT,NULL,0);
     }
 }
 
@@ -223,6 +229,22 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
         case MESSAGE_SWITCHES_POLL:
         {
             MESSAGE_POLL_PARAMETER parametro;
+
+            if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+            {
+                ui->sw1->setChecked(parametro.sw1);
+                ui->sw2->setChecked(parametro.sw2);
+            }
+            else
+            {
+                ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
+            }
+        }
+        break;
+
+        case MESSAGE_SWITCHES_INTERRUPT:
+        {
+            MESSAGE_INTERRUPT_PARAMETER parametro;
 
             if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
             {

@@ -22,6 +22,7 @@ typedef enum {
     MESSAGE_LED_PWM,
     MESSAGE_SWITCHES_POLL,
     MESSAGE_SWITCHES_INTERRUPT,
+    MESSAGE_SWITCHES_INTERRUPT_DISABLE,
     //etc, etc...
 } messageTypes;
 
