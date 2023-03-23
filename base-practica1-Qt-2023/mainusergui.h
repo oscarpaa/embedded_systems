@@ -35,7 +35,7 @@ private slots:
     void on_Knob_valueChanged(double value);
     void on_ADCButton_clicked();
     void on_pingButton_clicked();
-
+    void on_factor_currentIndexChanged(int index);
 
 private:
     // funciones privadas

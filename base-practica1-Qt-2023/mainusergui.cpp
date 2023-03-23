@@ -86,10 +86,6 @@ void MainUserGUI::on_runButton_clicked()
 {
     //Intenta arrancar la comunicacion con la TIVA
     tiva.startRemoteLink( ui->serialPortComboBox->currentText());
-
-    // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    cambiaMODO();
-    modoSwitches();
 }
 
 
@@ -173,7 +169,20 @@ void MainUserGUI::cambiaLEDs(void)
     tiva.sendMessage(MESSAGE_LED_GPIO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
 }
 
+void MainUserGUI::on_factor_currentIndexChanged(int index)
+{
+    MESSAGE_OVERSAMPLE_PARAMETER parameter;
+    if (!index)
+    {
+        parameter.factor = index;
+    }
+    else
+    {
+        parameter.factor = pow(2,index);
+    }
 
+    tiva.sendMessage(MESSAGE_OVERSAMPLE,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+}
 
 //**** Slot asociado a la recepción de mensajes desde la TIVA ********/
 //Está conectado a una señale generada por el objeto TIVA de clase QTivaRPC (se conecta en el constructor de la ventana, más arriba en este fichero))
@@ -217,6 +226,9 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
                 ui->lcdCh2->display(((double)parametro.chan2)*3.3/4096.0);
                 ui->lcdCh3->display(((double)parametro.chan3)*3.3/4096.0);
                 ui->lcdCh4->display(((double)parametro.chan4)*3.3/4096.0);
+                ui->lcdCh5->display(((double)parametro.chan5)*3.3/4096.0);
+                ui->lcdCh6->display(((double)parametro.chan6)*3.3/4096.0);
+                ui->temp->display(147.5-((75*3.3*(double)parametro.temp)/4096.0));
             }
             else
             {   //Si el tamanho de los datos no es correcto emito la senhal statusChanged(...) para reportar un error
@@ -302,6 +314,4 @@ void MainUserGUI::tivaStatusChanged(int status,QString message)
             processError(tiva.getLastErrorMessage());
     }
 }
-
-
 

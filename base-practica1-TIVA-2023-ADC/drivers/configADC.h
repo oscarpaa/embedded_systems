@@ -16,6 +16,9 @@ typedef struct
 	uint16_t chan2;
 	uint16_t chan3;
 	uint16_t chan4;
+	uint16_t chan5;
+	uint16_t chan6;
+	uint16_t temp;
 } MuestrasADC;
 
 typedef struct
@@ -24,6 +27,9 @@ typedef struct
 	uint32_t chan2;
 	uint32_t chan3;
 	uint32_t chan4;
+	uint32_t chan5;
+	uint32_t chan6;
+	uint32_t temp;
 } MuestrasLeidasADC;
 
 

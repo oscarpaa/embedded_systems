@@ -146,7 +146,9 @@ static portTASK_FUNCTION(ADCTask,pvParameters)
         parameter.chan2=muestras.chan2;
         parameter.chan3=muestras.chan3;
         parameter.chan4=muestras.chan4;
-
+        parameter.chan5=muestras.chan5;
+        parameter.chan6=muestras.chan6;
+        parameter.temp=muestras.temp;
         //Encia el mensaje hacia QT
         remotelink_sendMessage(MESSAGE_ADC_SAMPLE,(void *)&parameter,sizeof(parameter));
     }
@@ -265,15 +267,26 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
         break;
         case MESSAGE_SWITCHES_INTERRUPT:
         {
-            GPIOIntTypeSet(GPIO_PORTF_BASE, ALL_BUTTONS,GPIO_BOTH_EDGES);
-            IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);
             GPIOIntEnable(GPIO_PORTF_BASE,ALL_BUTTONS);
-            IntEnable(INT_GPIOF);
         }
         break;
         case MESSAGE_SWITCHES_INTERRUPT_DISABLE:
         {
-            IntDisable(INT_GPIOF);
+            GPIOIntDisable(GPIO_PORTF_BASE,ALL_BUTTONS);
+        }
+        break;
+        case MESSAGE_OVERSAMPLE:
+        {
+            MESSAGE_OVERSAMPLE_PARAMETER parametro;
+
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                ADCHardwareOversampleConfigure(ADC0_BASE, parametro.factor);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
         }
         break;
        default:
@@ -326,6 +339,9 @@ int main(void)
 	 //Inicializa los botones (tambien en el puerto F) y habilita sus interrupciones
 	ButtonsInit();  // <----------
 
+	GPIOIntTypeSet(GPIO_PORTF_BASE, ALL_BUTTONS,GPIO_BOTH_EDGES);
+    IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_GPIOF);
 
 	if ((cola_estados = xQueueCreate(20, sizeof(MESSAGE_INTERRUPT_PARAMETER))) == NULL)
 	{
