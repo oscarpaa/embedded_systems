@@ -16,7 +16,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
-#include "Eventos.h"
 
 
 static QueueHandle_t cola_adc;
@@ -25,7 +24,6 @@ static QueueHandle_t cola_adc;
 void configADC_DisparaADC(void)
 {
 	ADCProcessorTrigger(ADC0_BASE,0);
-	xEventGroupSetBits(grupo_eventos,EVENTO_ADC_MANUAL);
 }
 
 void configADC_Promedio(uint32_t factor)
@@ -35,38 +33,40 @@ void configADC_Promedio(uint32_t factor)
 
 void configADC_Mode(uint8_t mode, uint32_t frecuency)
 {
-    if (!mode) // muestreo manual
-    {
-        TimerControlTrigger(TIMER2_BASE, TIMER_A, false); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
-        TimerDisable(TIMER2_BASE, TIMER_A);
+    switch (mode) {
+        case ADC_STATE_MANUAL:
+        {
+            TimerControlTrigger(TIMER2_BASE, TIMER_A, false); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
+            TimerDisable(TIMER2_BASE, TIMER_A);
 
-        ADCSequenceDisable(ADC0_BASE,0);
-        ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_PROCESSOR,0);  //Disparo software (processor trigger)
-        ADCSequenceEnable(ADC0_BASE,0);
-    }
-    else if (mode == 1) // muestreo periodico
-    {
-        //Habilitar Temporizador 2
-        SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
-        SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER2);
-        //Configurar temporizador como periódico
-        TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);
+            ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_PROCESSOR,0);  //Disparo software (processor trigger)
+        }
+        break;
 
-        TimerControlTrigger(TIMER2_BASE, TIMER_A, true); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
+        case ADC_STATE_AUTO:
+        {
+            //Habilitar Temporizador 2
+            SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
+            SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER2);
+            //Configurar temporizador como periódico
+            TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);
 
-        //Cargar el valor que contará el temporizador
-        TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
-        TimerEnable(TIMER2_BASE, TIMER_A);
+            TimerControlTrigger(TIMER2_BASE, TIMER_A, true); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
 
-        ADCSequenceDisable(ADC0_BASE,0);
-        ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_TIMER,0);
-        ADCSequenceEnable(ADC0_BASE,0);
+            //Cargar el valor que contará el temporizador
+            TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
+            TimerEnable(TIMER2_BASE, TIMER_A);
 
-    }
-    else if (mode == 2) // cambia frecuencia en modo peiodico
-    {
-        //Cargar el valor que contará el temporizador
-        TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
+            ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_TIMER,0);
+        }
+        break;
+
+        case ADC_STATE_CHANGE_FREC:
+        {
+            //Cargar el valor que contará el temporizador
+            TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
+        }
+        break;
     }
 }
 
@@ -140,7 +140,6 @@ void configADC_ISR(void)
 	    finales.chan[i] = leidas.chan[i];
     }
 
-	xEventGroupSetBitsFromISR(grupo_eventos, EVENTO_ADC_PERIODICO, &higherPriorityTaskWoken);
 	//Guardamos en la cola
 	xQueueSendFromISR(cola_adc,&finales,&higherPriorityTaskWoken);
 	portEND_SWITCHING_ISR(higherPriorityTaskWoken);

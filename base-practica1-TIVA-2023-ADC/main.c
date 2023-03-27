@@ -53,6 +53,7 @@ uint32_t g_ui32CPUUsage;
 uint32_t g_ulSystemClock;
 
 static QueueHandle_t cola_estados;
+static TaskHandle_t tarea_eventos;
 EventGroupHandle_t grupo_eventos;
 
 //*****************************************************************************
@@ -144,17 +145,16 @@ static portTASK_FUNCTION(EVENTSTask,pvParameters)
     MuestrasADC muestras;
     MESSAGE_ADC_SAMPLE_PARAMETER adc_manual;
 
-    MESSAGE_ADC_AUTO_SAMPLING_6X16_PARAMETER adc_periodico;
+    MESSAGE_ADC_AUTO_SAMPLE16_PARAMETER adc_periodico;
 
     uint8_t cont = 0;
 
     while(1)
     {
-        eventos = xEventGroupWaitBits(grupo_eventos, EVENTO_ADC_MANUAL|EVENTO_ADC_PERIODICO, pdTRUE, pdFALSE, portMAX_DELAY);
+        eventos = xEventGroupWaitBits(grupo_eventos, EVENTO_ADC_MANUAL|EVENTO_ADC_PERIODICO, pdFALSE, pdFALSE, portMAX_DELAY);
 
         if (eventos & EVENTO_ADC_MANUAL)
         {
-            cont = 0;
             configADC_LeeADC(&muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
 
             //Copia los datos en el parametro (es un poco redundante)
@@ -178,10 +178,14 @@ static portTASK_FUNCTION(EVENTSTask,pvParameters)
 
             if (cont == 15)
             {
+                cont = 0;
                 //Encia el mensaje hacia QT
-                remotelink_sendMessage(MESSAGE_ADC_AUTO_SAMPLING_6X16,(void *)&adc_periodico,sizeof(adc_periodico));
+                remotelink_sendMessage(MESSAGE_ADC_AUTO_SAMPLE16,(void *)&adc_periodico,sizeof(adc_periodico));
             }
-            cont = (cont + 1) % 16;
+            else
+            {
+                cont++;
+            }
         }
     }
 }
@@ -230,6 +234,7 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
         break;
         case MESSAGE_ADC_SAMPLE:
         {
+            xEventGroupSetBits(grupo_eventos,EVENTO_ADC_MANUAL);
             configADC_DisparaADC(); //Dispara la conversion (por software)
         }
         break;
@@ -308,12 +313,32 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
             }
         }
         break;
+        case MESSAGE_ADC_AUTO_DISABLE:
+        {
+            xEventGroupClearBits(grupo_eventos,EVENTO_ADC_PERIODICO);
+
+            configADC_Mode(ADC_STATE_MANUAL,0);
+            vTaskDelete(tarea_eventos);
+            if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
+            {
+                while(1);
+            }
+        }
+        break;
         case MESSAGE_ADC_AUTO_ENABLE:
         {
             MESSAGE_ADC_AUTO_ENABLE_PARAMETER parametro;
             if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
             {
-                configADC_Mode(1,parametro.frecuency);
+                xEventGroupClearBits(grupo_eventos,EVENTO_ADC_MANUAL);
+                xEventGroupSetBits(grupo_eventos, EVENTO_ADC_PERIODICO);
+
+                configADC_Mode(ADC_STATE_AUTO,parametro.frecuency);
+                vTaskDelete(tarea_eventos);
+                if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
+                {
+                    while(1);
+                }
             }
             else
             {
@@ -326,7 +351,7 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
             MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parametro;
             if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
             {
-                configADC_Mode(2,parametro.frecuency);
+                configADC_Mode(ADC_STATE_CHANGE_FREC,parametro.frecuency);
             }
             else
             {
@@ -334,11 +359,7 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
             }
         }
         break;
-        case MESSAGE_ADC_AUTO_DISABLE:
-        {
-            configADC_Mode(0,0);
-        }
-        break;
+
        default:
            //mensaje desconocido/no implementado
            status=PROT_ERROR_UNIMPLEMENTED_COMMAND; //Devuelve error.
@@ -429,7 +450,7 @@ int main(void)
         while(1);
     }
 
-	if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, NULL) != pdTRUE))
+	if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
     {
         while(1);
     }

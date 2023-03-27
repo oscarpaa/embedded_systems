@@ -316,9 +316,9 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
         }
         break;
 
-        case MESSAGE_ADC_AUTO_SAMPLING_6X16:
+        case MESSAGE_ADC_AUTO_SAMPLE16:
         {
-            MESSAGE_ADC_AUTO_SAMPLING_6X16_PARAMETER parametro;
+            MESSAGE_ADC_AUTO_SAMPLE16_PARAMETER parametro;
 
             if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
             {
@@ -330,15 +330,15 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
                 ui->lcdCh6->display(((double)parametro.chan[5][15])*3.3/4096.0);
 
                 //Recalcula los valores de la grafica
-                for (int i = 0; i < 1024-16; ++i) {
+                for (int i = 1023; i >= 16; --i) {
                     for (int j = 0; j < 6; ++j) {
-                         yVal[j][i] = yVal[j][i+16];
+                        yVal[j][i] = yVal[j][i-16];
                     }
                 }
 
                 for (int i = 0; i < 16; ++i) {
                     for (int j = 0; j < 6; ++j) {
-                         yVal[j][1024-16+i] = (((double)parametro.chan[j][i])*3.3/4096.0);
+                         yVal[j][i] = (((double)parametro.chan[j][i])*3.3/4096.0);
                     }
                 }
 

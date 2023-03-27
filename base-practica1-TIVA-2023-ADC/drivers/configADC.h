@@ -20,6 +20,11 @@ typedef struct
 	uint32_t chan[7];
 } MuestrasLeidasADC;
 
+enum {
+    ADC_STATE_MANUAL,
+    ADC_STATE_AUTO,
+    ADC_STATE_CHANGE_FREC,
+};
 
 void configADC_ISR(void);
 void configADC_DisparaADC(void);

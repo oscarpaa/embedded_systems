@@ -28,7 +28,7 @@ typedef enum {
     MESSAGE_ADC_AUTO_ENABLE,
     MESSAGE_ADC_AUTO_FRECUENCY,
     MESSAGE_ADC_AUTO_DISABLE,
-    MESSAGE_ADC_AUTO_SAMPLING_6X16,
+    MESSAGE_ADC_AUTO_SAMPLE16,
     //etc, etc...
 } messageTypes;
 
@@ -94,7 +94,7 @@ typedef struct {
 
 typedef struct {
     uint16_t chan[6][16];
-} MESSAGE_ADC_AUTO_SAMPLING_6X16_PARAMETER;
+} MESSAGE_ADC_AUTO_SAMPLE16_PARAMETER;
 
 #pragma pack()  //...Pero solo para los comandos que voy a intercambiar, no para el resto.
 
