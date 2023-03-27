@@ -9,6 +9,7 @@
 #include<stdint.h>      // Cabecera para usar tipos de enteros con tamaño
 #include<stdbool.h>     // Cabecera para usar booleanos
 
+
 MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     QWidget(parent),
     ui(new Ui::MainUserGUI)               // Indica que guipanel.ui es el interfaz grafico de la clase
@@ -42,6 +43,42 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     ventanaPopUp.setWindowTitle(tr("Evento"));
     ventanaPopUp.setParent(this,Qt::Popup);
 
+    // --- Inicializo Grafica ADC ---
+    ui->graficaADC->setTitle("Canales ADC");;
+    ui->graficaADC->setAxisTitle(QwtPlot::xBottom, "Tiempo");
+    ui->graficaADC->setAxisTitle(QwtPlot::yLeft, "Voltaje");
+    ui->graficaADC->setAxisScale(QwtPlot::yLeft, 0, 3.3);
+    ui->graficaADC->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
+
+    // Formateo de la curva
+    for(int i = 0; i < 6; i++){
+        Channels[i] = new QwtPlotCurve();
+        Channels[i]->attach(ui->graficaADC);
+    }
+
+    //Inicializacion de los valores básicos
+    for(int i = 0; i < 1024; i++){
+        xVal[i]=i;
+        for (int j = 0; j < 6; j++) {
+            yVal[j][i] = 0;
+        }
+    }
+    for (int i = 0; i < 6; i++) {
+        Channels[i]->setRawSamples(xVal,yVal[i],1024);
+    }
+
+    Channels[0]->setPen(QPen(Qt::red)); // Color de la curva
+    Channels[1]->setPen(QPen(Qt::green));
+    Channels[2]->setPen(QPen(Qt::blue));
+    Channels[3]->setPen(QPen(Qt::cyan));
+    Channels[4]->setPen(QPen(Qt::magenta));
+    Channels[5]->setPen(QPen(Qt::yellow));
+
+    m_Grid = new QwtPlotGrid();     // Rejilla de puntos
+    m_Grid->attach(ui->graficaADC);    // que se asocia al objeto QwtPl
+    ui->graficaADC->setAutoReplot(false); //Desactiva el autoreplot (mejora la eficiencia)
+    // --- Inicializo Grafica ADC ---
+
     //Conexion de signals de los widgets del interfaz con slots propios de este objeto
     connect(ui->rojo,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
     connect(ui->verde,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
@@ -50,6 +87,7 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     connect(ui->gpio,SIGNAL(toggled(bool)),this,SLOT(cambiaMODO()));
     connect(ui->sondeo,SIGNAL(toggled(bool)),this,SLOT(modoSwitches()));
     connect(ui->estado,SIGNAL(clicked(bool)),this,SLOT(leeSwitches()));
+    connect(ui->manual,SIGNAL(toggled(bool)),this,SLOT(modoAdquisicion()));
 
     //Conectamos Slots del objeto "Tiva" con Slots de nuestra aplicacion (o con widgets)
     connect(&tiva,SIGNAL(statusChanged(int,QString)),this,SLOT(tivaStatusChanged(int,QString)));
@@ -113,6 +151,46 @@ void MainUserGUI::on_Knob_valueChanged(double value)
     parameter.rIntensity = value;
 
     tiva.sendMessage(MESSAGE_LED_PWM_BRIGHTNESS,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+}
+
+void MainUserGUI::on_frecuencia_valueChanged(double value)
+{
+    MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
+    if (ui->period->isChecked())
+    {
+        parameter.frecuency = value * pow(10,ui->multiplica->currentIndex());
+
+        tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+    }
+}
+
+
+void MainUserGUI::on_multiplica_currentIndexChanged(int index)
+{
+    MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
+    if (ui->period->isChecked())
+    {
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,index);
+
+        tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+    }
+}
+
+void MainUserGUI::modoAdquisicion()
+{
+    MESSAGE_ADC_AUTO_ENABLE_PARAMETER parameter;
+    if (ui->manual->isChecked())
+    {
+        ui->ADCButton->setHidden(false);
+        tiva.sendMessage(MESSAGE_ADC_AUTO_DISABLE,NULL,0);
+    }
+    else
+    {
+        ui->ADCButton->setHidden(true);
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
+
+        tiva.sendMessage(MESSAGE_ADC_AUTO_ENABLE,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+    }
 }
 
 void MainUserGUI::on_ADCButton_clicked()
@@ -222,19 +300,54 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
             MESSAGE_ADC_SAMPLE_PARAMETER parametro;
             if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
             {
-                ui->lcdCh1->display(((double)parametro.chan1)*3.3/4096.0);
-                ui->lcdCh2->display(((double)parametro.chan2)*3.3/4096.0);
-                ui->lcdCh3->display(((double)parametro.chan3)*3.3/4096.0);
-                ui->lcdCh4->display(((double)parametro.chan4)*3.3/4096.0);
-                ui->lcdCh5->display(((double)parametro.chan5)*3.3/4096.0);
-                ui->lcdCh6->display(((double)parametro.chan6)*3.3/4096.0);
-                ui->temp->display(147.5-((75*3.3*(double)parametro.temp)/4096.0));
+                ui->lcdCh1->display(((double)parametro.chan[0])*3.3/4096.0);
+                ui->lcdCh2->display(((double)parametro.chan[1])*3.3/4096.0);
+                ui->lcdCh3->display(((double)parametro.chan[2])*3.3/4096.0);
+                ui->lcdCh4->display(((double)parametro.chan[3])*3.3/4096.0);
+                ui->lcdCh5->display(((double)parametro.chan[4])*3.3/4096.0);
+                ui->lcdCh6->display(((double)parametro.chan[5])*3.3/4096.0);
+                ui->temp->display(147.5-((75*3.3*(double)parametro.chan[6])/4096.0));
             }
             else
             {   //Si el tamanho de los datos no es correcto emito la senhal statusChanged(...) para reportar un error
                 ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
             }
 
+        }
+        break;
+
+        case MESSAGE_ADC_AUTO_SAMPLING_6X16:
+        {
+            MESSAGE_ADC_AUTO_SAMPLING_6X16_PARAMETER parametro;
+
+            if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+            {
+                ui->lcdCh1->display(((double)parametro.chan[0][15])*3.3/4096.0);
+                ui->lcdCh2->display(((double)parametro.chan[1][15])*3.3/4096.0);
+                ui->lcdCh3->display(((double)parametro.chan[2][15])*3.3/4096.0);
+                ui->lcdCh4->display(((double)parametro.chan[3][15])*3.3/4096.0);
+                ui->lcdCh5->display(((double)parametro.chan[4][15])*3.3/4096.0);
+                ui->lcdCh6->display(((double)parametro.chan[5][15])*3.3/4096.0);
+
+                //Recalcula los valores de la grafica
+                for (int i = 0; i < 1024-16; ++i) {
+                    for (int j = 0; j < 6; ++j) {
+                         yVal[j][i] = yVal[j][i+16];
+                    }
+                }
+
+                for (int i = 0; i < 16; ++i) {
+                    for (int j = 0; j < 6; ++j) {
+                         yVal[j][1024-16+i] = (((double)parametro.chan[j][i])*3.3/4096.0);
+                    }
+                }
+
+                ui->graficaADC->replot(); //Refresca la grafica una vez actualizados los valores
+            }
+            else
+            {
+                ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
+            }
         }
         break;
 

@@ -34,23 +34,26 @@
 #include <remotelink.h>
 #include <serialprotocol.h>
 
+#include "drivers/Eventos.h"
+
 
 //parametros de funcionamiento de la tareas
 #define REMOTELINK_TASK_STACK (512)
 #define REMOTELINK_TASK_PRIORITY (tskIDLE_PRIORITY+2)
 #define COMMAND_TASK_STACK (512)
 #define COMMAND_TASK_PRIORITY (tskIDLE_PRIORITY+1)
-#define ADC_TASK_STACK (256)
-#define ADC_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 
 #define ESTADOS_TASK_STACK (256)
 #define ESTADOS_TASK_PRIORITY (tskIDLE_PRIORITY+1)
+#define EVENTS_TASK_STACK (512)
+#define EVENTS_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 
 //Globales
 uint32_t g_ui32CPUUsage;
 uint32_t g_ulSystemClock;
 
-QueueHandle_t cola_estados;
+static QueueHandle_t cola_estados;
+EventGroupHandle_t grupo_eventos;
 
 //*****************************************************************************
 //
@@ -124,49 +127,65 @@ void vApplicationMallocFailedHook (void)
 //
 //*****************************************************************************
 
-
-//Para especificacion 2. Esta tarea no tendria por que ir en main.c
-static portTASK_FUNCTION(ADCTask,pvParameters)
-{
-
-    MuestrasADC muestras;
-    MESSAGE_ADC_SAMPLE_PARAMETER parameter;
-
-
-    //
-    // Bucle infinito, las tareas en FreeRTOS no pueden "acabar", deben "matarse" con la funcion xTaskDelete().
-    //
-    while(1)
-    {
-
-        configADC_LeeADC(&muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
-
-        //Copia los datos en el parametro (es un poco redundante)
-        parameter.chan1=muestras.chan1;
-        parameter.chan2=muestras.chan2;
-        parameter.chan3=muestras.chan3;
-        parameter.chan4=muestras.chan4;
-        parameter.chan5=muestras.chan5;
-        parameter.chan6=muestras.chan6;
-        parameter.temp=muestras.temp;
-        //Encia el mensaje hacia QT
-        remotelink_sendMessage(MESSAGE_ADC_SAMPLE,(void *)&parameter,sizeof(parameter));
-    }
-}
-
 static portTASK_FUNCTION(STATE_SWITCHESTask,pvParameters)
 {
-    MESSAGE_INTERRUPT_PARAMETER parameter;
-
-    //
-    // Bucle infinito, las tareas en FreeRTOS no pueden "acabar", deben "matarse" con la funcion xTaskDelete().
-    //
+    MESSAGE_INTERRUPT_PARAMETER switches;
     while(1)
     {
-        xQueueReceive(cola_estados,&parameter,portMAX_DELAY);
-        remotelink_sendMessage(MESSAGE_SWITCHES_INTERRUPT,(void *)&parameter,sizeof(parameter));
+        xQueueReceive(cola_estados,&switches,portMAX_DELAY);
+        remotelink_sendMessage(MESSAGE_SWITCHES_INTERRUPT,(void *)&switches,sizeof(switches));
     }
 }
+
+static portTASK_FUNCTION(EVENTSTask,pvParameters)
+{
+    EventBits_t eventos;
+
+    MuestrasADC muestras;
+    MESSAGE_ADC_SAMPLE_PARAMETER adc_manual;
+
+    MESSAGE_ADC_AUTO_SAMPLING_6X16_PARAMETER adc_periodico;
+
+    uint8_t cont = 0;
+
+    while(1)
+    {
+        eventos = xEventGroupWaitBits(grupo_eventos, EVENTO_ADC_MANUAL|EVENTO_ADC_PERIODICO, pdTRUE, pdFALSE, portMAX_DELAY);
+
+        if (eventos & EVENTO_ADC_MANUAL)
+        {
+            cont = 0;
+            configADC_LeeADC(&muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
+
+            //Copia los datos en el parametro (es un poco redundante)
+            uint8_t i;
+            for (i = 0; i < 7; ++i) {
+                adc_manual.chan[i] = muestras.chan[i];
+            }
+
+            //Encia el mensaje hacia QT
+            remotelink_sendMessage(MESSAGE_ADC_SAMPLE,(void *)&adc_manual,sizeof(adc_manual));
+        }
+        else if (eventos & EVENTO_ADC_PERIODICO)
+        {
+            configADC_LeeADC(&muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
+
+            //Copia los datos en el parametro (es un poco redundante)
+            uint8_t i;
+            for (i = 0; i < 6; ++i) {
+                adc_periodico.chan[i][cont] = muestras.chan[i];
+            }
+
+            if (cont == 15)
+            {
+                //Encia el mensaje hacia QT
+                remotelink_sendMessage(MESSAGE_ADC_AUTO_SAMPLING_6X16,(void *)&adc_periodico,sizeof(adc_periodico));
+            }
+            cont = (cont + 1) % 16;
+        }
+    }
+}
+
 
 //Funcion callback que procesa los mensajes recibidos desde el PC (ejecuta las acciones correspondientes a las ordenes recibidas)
 static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t parameterSize)
@@ -281,12 +300,43 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
 
             if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
             {
-                ADCHardwareOversampleConfigure(ADC0_BASE, parametro.factor);
+                configADC_Promedio(parametro.factor);
             }
             else
             {
                 status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
             }
+        }
+        break;
+        case MESSAGE_ADC_AUTO_ENABLE:
+        {
+            MESSAGE_ADC_AUTO_ENABLE_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                configADC_Mode(1,parametro.frecuency);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_ADC_AUTO_FRECUENCY:
+        {
+            MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                configADC_Mode(2,parametro.frecuency);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_ADC_AUTO_DISABLE:
+        {
+            configADC_Mode(0,0);
         }
         break;
        default:
@@ -343,6 +393,12 @@ int main(void)
     IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_GPIOF);
 
+
+    if((grupo_eventos = xEventGroupCreate()) == NULL)
+    {
+        while(1);
+    }
+
 	if ((cola_estados = xQueueCreate(20, sizeof(MESSAGE_INTERRUPT_PARAMETER))) == NULL)
 	{
 	    while(1);
@@ -366,13 +422,14 @@ int main(void)
 
 	//Para especificacion 2: Inicializa el ADC y crea una tarea...
 	configADC_IniciaADC();
-    if((xTaskCreate(ADCTask, (portCHAR *)"ADC", ADC_TASK_STACK,NULL,ADC_TASK_PRIORITY, NULL) != pdTRUE))
+
+    // Control asíncrono mediante eventos de entradas digitales
+    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"ESTADO INT", ESTADOS_TASK_STACK,NULL,ESTADOS_TASK_PRIORITY, NULL) != pdTRUE))
     {
         while(1);
     }
 
-    // Control asíncrono mediante eventos de entradas digitales
-    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"ESTADO INT", ESTADOS_TASK_STACK,NULL,ESTADOS_TASK_PRIORITY, NULL) != pdTRUE))
+	if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, NULL) != pdTRUE))
     {
         while(1);
     }

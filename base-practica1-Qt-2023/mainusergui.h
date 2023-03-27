@@ -5,6 +5,9 @@
 #include <QtSerialPort/qserialport.h>
 #include <QMessageBox>
 #include "tiva_remotelink.h"
+#include <qwt_plot_curve.h>
+#include <qwt_plot_grid.h>
+#include <QPen>
 
 namespace Ui {
 class MainUserGUI;
@@ -24,6 +27,7 @@ private slots:
     void cambiaMODO();
     void modoSwitches();
     void leeSwitches();
+    void modoAdquisicion();
     void tivaStatusChanged(int status,QString message);
     void messageReceived(uint8_t type, QByteArray datos);
 
@@ -36,6 +40,8 @@ private slots:
     void on_ADCButton_clicked();
     void on_pingButton_clicked();
     void on_factor_currentIndexChanged(int index);
+    void on_frecuencia_valueChanged(double value);
+    void on_multiplica_currentIndexChanged(int index);
 
 private:
     // funciones privadas
@@ -49,6 +55,10 @@ private:
     QMessageBox ventanaPopUp;
     TivaRemoteLink tiva; //Objeto para gestionar la comunicacion de mensajes con el microcontrolador
 
+    double xVal[1024]; //valores eje X
+    double yVal[6][1024]; //valores ejes Y
+    QwtPlotCurve *Channels[6]; //Curvas
+    QwtPlotGrid  *m_Grid; //Cuadricula
 };
 
 #endif // GUIPANEL_H

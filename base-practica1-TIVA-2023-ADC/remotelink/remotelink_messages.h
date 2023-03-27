@@ -24,6 +24,10 @@ typedef enum {
     MESSAGE_SWITCHES_INTERRUPT,
     MESSAGE_SWITCHES_INTERRUPT_DISABLE,
     MESSAGE_OVERSAMPLE,
+    MESSAGE_ADC_AUTO_ENABLE,
+    MESSAGE_ADC_AUTO_FRECUENCY,
+    MESSAGE_ADC_AUTO_DISABLE,
+    MESSAGE_ADC_AUTO_SAMPLING_6X16,
     //etc, etc...
 } messageTypes;
 
@@ -52,13 +56,7 @@ typedef struct {
 
 typedef struct
 {
-    uint16_t chan1;
-    uint16_t chan2;
-    uint16_t chan3;
-    uint16_t chan4;
-    uint16_t chan5;
-    uint16_t chan6;
-    uint16_t temp;
+    uint16_t chan[7];
 } MESSAGE_ADC_SAMPLE_PARAMETER;
 
 typedef struct {
@@ -84,6 +82,19 @@ typedef struct {
 typedef struct {
     uint32_t factor;
 } MESSAGE_OVERSAMPLE_PARAMETER;
+
+typedef struct {
+    uint32_t frecuency;
+} MESSAGE_ADC_AUTO_ENABLE_PARAMETER;
+
+typedef struct {
+    uint32_t frecuency;
+} MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER;
+
+typedef struct {
+    uint16_t chan[6][16];
+} MESSAGE_ADC_AUTO_SAMPLING_6X16_PARAMETER;
+
 
 #pragma pack()  //...Pero solo para los comandos que voy a intercambiar, no para el resto.
 
