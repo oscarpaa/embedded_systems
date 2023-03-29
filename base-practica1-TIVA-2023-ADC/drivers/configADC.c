@@ -19,11 +19,13 @@
 
 
 static QueueHandle_t cola_adc;
+static QueueHandle_t cola_adc1;
 
 //Provoca el disparo de una conversion (hemos configurado el ADC con "disparo software" (Processor trigger)
 void configADC_DisparaADC(void)
 {
 	ADCProcessorTrigger(ADC0_BASE,0);
+	ADCProcessorTrigger(ADC1_BASE,1);
 }
 
 void configADC_Promedio(uint32_t factor)
@@ -34,7 +36,7 @@ void configADC_Promedio(uint32_t factor)
 void configADC_Mode(uint8_t mode, uint32_t frecuency)
 {
     switch (mode) {
-        case ADC_STATE_MANUAL:
+        case MODE_ADC_MANUAL:
         {
             TimerControlTrigger(TIMER2_BASE, TIMER_A, false); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
             TimerDisable(TIMER2_BASE, TIMER_A);
@@ -42,15 +44,8 @@ void configADC_Mode(uint8_t mode, uint32_t frecuency)
             ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_PROCESSOR,0);  //Disparo software (processor trigger)
         }
         break;
-
-        case ADC_STATE_AUTO:
+        case MODE_ADC_AUTO:
         {
-            //Habilitar Temporizador 2
-            SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
-            SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER2);
-            //Configurar temporizador como periódico
-            TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);
-
             TimerControlTrigger(TIMER2_BASE, TIMER_A, true); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
 
             //Cargar el valor que contará el temporizador
@@ -60,17 +55,19 @@ void configADC_Mode(uint8_t mode, uint32_t frecuency)
             ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_TIMER,0);
         }
         break;
-
-        case ADC_STATE_CHANGE_FREC:
-        {
-            //Cargar el valor que contará el temporizador
-            TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
-        }
-        break;
+//        case MODE_ADC_AUTO_DIFF:
+//        {
+//            TimerControlTrigger(TIMER2_BASE, TIMER_A, true); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
+//
+//            //Cargar el valor que contará el temporizador
+//            TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
+//            TimerEnable(TIMER2_BASE, TIMER_A);
+//        }
+//        break;
     }
 }
 
-void configADC_IniciaADC(void)
+void configADC_IniciaADC0(void)
 {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_ADC0);
@@ -118,10 +115,66 @@ void configADC_IniciaADC(void)
     }
 }
 
+void configADC_IniciaADC1(void)
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC1);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_ADC1);
 
-void configADC_LeeADC(MuestrasADC *datos)
+    //HABILITAMOS EL GPIOE,GPIOD
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOE);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOD);
+
+    // Enable pin PE for ADC AIN0|AIN1|AIN2|AIN3
+    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_3|GPIO_PIN_2|GPIO_PIN_1|GPIO_PIN_0);
+    // Enable pin PD for ADC AIN6|AIN7
+    GPIOPinTypeADC(GPIO_PORTD_BASE, GPIO_PIN_1|GPIO_PIN_0);
+
+    //Habilitar Temporizador 2
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER2);
+    //Configurar temporizador como periódico
+    TimerConfigure(TIMER2_BASE, TIMER_CFG_PERIODIC);
+
+    TimerControlTrigger(TIMER2_BASE, TIMER_A, true); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
+
+    // 4 secuenciadores. 0->8 muestras; 1,2->4 muestras; 3-> 1 muestra
+    //CONFIGURAR SECUENCIADOR 1
+    ADCSequenceDisable(ADC1_BASE,1);
+
+    //Configuramos la velocidad de conversion al maximo (1MS/s)
+//    ADCClockConfigSet(ADC1_BASE, ADC_CLOCK_RATE_FULL, 1);
+
+    ADCSequenceConfigure(ADC1_BASE,1,ADC_TRIGGER_TIMER,1);
+    ADCSequenceStepConfigure(ADC1_BASE,1,0,ADC_CTL_D|ADC_CTL_CH0);
+    ADCSequenceStepConfigure(ADC1_BASE,1,1,ADC_CTL_D|ADC_CTL_CH1);
+    ADCSequenceStepConfigure(ADC1_BASE,1,2,ADC_CTL_D|ADC_CTL_CH3);
+    ADCSequenceStepConfigure(ADC1_BASE,1,3,ADC_CTL_IE|ADC_CTL_END); //La ultima muestra provoca la interrupcion
+    ADCSequenceEnable(ADC1_BASE,1); //ACTIVO LA SECUENCIA
+
+    //Habilita las interrupciones
+    ADCIntClear(ADC1_BASE,1);
+    ADCIntEnable(ADC1_BASE,1);
+    IntPrioritySet(INT_ADC1SS1,configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_ADC1SS1);
+
+    //Creamos una cola de mensajes para la comunicacion entre la ISR y la tara que llame a configADC_LeeADC(...)
+    cola_adc1=xQueueCreate(8,sizeof(MuestrasADC1));
+    if (cola_adc1==NULL)
+    {
+        while(1);
+    }
+}
+
+void configADC_LeeADC0(MuestrasADC *datos)
 {
 	xQueueReceive(cola_adc,datos,portMAX_DELAY);
+}
+
+void configADC_LeeADC1(MuestrasADC1 *datos)
+{
+    xQueueReceive(cola_adc1,datos,portMAX_DELAY);
 }
 
 void configADC_ISR(void)
@@ -143,4 +196,25 @@ void configADC_ISR(void)
 	//Guardamos en la cola
 	xQueueSendFromISR(cola_adc,&finales,&higherPriorityTaskWoken);
 	portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+}
+
+void configADC_ISR1(void)
+{
+    portBASE_TYPE higherPriorityTaskWoken=pdFALSE;
+
+    MuestrasLeidasADC1 leidas;
+    MuestrasADC1 finales;
+
+    ADCIntClear(ADC1_BASE,1);//LIMPIAMOS EL FLAG DE INTERRUPCIONES
+    ADCSequenceDataGet(ADC1_BASE,1,(uint32_t *)&leidas);//COGEMOS LOS DATOS GUARDADOS
+
+    //Pasamos de 32 bits a 16 (el conversor es de 12 bits, así que sólo son significativos los bits del 0 al 11)
+    uint8_t i;
+    for (i = 0; i < 3; ++i) {
+        finales.chan[i] = leidas.chan[i];
+    }
+
+    //Guardamos en la cola
+    xQueueSendFromISR(cola_adc1,&finales,&higherPriorityTaskWoken);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }

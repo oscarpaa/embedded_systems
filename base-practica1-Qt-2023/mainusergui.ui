@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>882</width>
-    <height>542</height>
+    <height>640</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>0</x>
      <y>40</y>
      <width>881</width>
-     <height>451</height>
+     <height>561</height>
     </rect>
    </property>
    <property name="currentIndex">
@@ -32,8 +32,8 @@
     <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
       <rect>
-       <x>630</x>
-       <y>50</y>
+       <x>590</x>
+       <y>120</y>
        <width>171</width>
        <height>243</height>
       </rect>
@@ -84,8 +84,8 @@
     <widget class="QSplitter" name="splitter_2">
      <property name="geometry">
       <rect>
-       <x>80</x>
-       <y>60</y>
+       <x>120</x>
+       <y>80</y>
        <width>54</width>
        <height>66</height>
       </rect>
@@ -112,8 +112,8 @@
     <widget class="QWidget" name="gridLayoutWidget">
      <property name="geometry">
       <rect>
-       <x>70</x>
-       <y>220</y>
+       <x>80</x>
+       <y>230</y>
        <width>261</width>
        <height>71</height>
       </rect>
@@ -173,8 +173,8 @@
     <widget class="QPushButton" name="estado">
      <property name="geometry">
       <rect>
-       <x>70</x>
-       <y>320</y>
+       <x>340</x>
+       <y>400</y>
        <width>139</width>
        <height>24</height>
       </rect>
@@ -186,8 +186,8 @@
     <widget class="QGroupBox" name="groupBox">
      <property name="geometry">
       <rect>
-       <x>430</x>
-       <y>210</y>
+       <x>100</x>
+       <y>380</y>
        <width>120</width>
        <height>80</height>
       </rect>
@@ -195,6 +195,19 @@
      <property name="title">
       <string>Switches</string>
      </property>
+     <widget class="QRadioButton" name="interrupt">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>50</y>
+        <width>89</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Interrupción</string>
+      </property>
+     </widget>
      <widget class="QRadioButton" name="sondeo">
       <property name="geometry">
        <rect>
@@ -209,19 +222,6 @@
       </property>
       <property name="checked">
        <bool>true</bool>
-      </property>
-     </widget>
-     <widget class="QRadioButton" name="interrupt">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>50</y>
-        <width>89</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Interrupción</string>
       </property>
      </widget>
     </widget>
@@ -255,7 +255,7 @@
        <rect>
         <x>10</x>
         <y>20</y>
-        <width>89</width>
+        <width>55</width>
         <height>20</height>
        </rect>
       </property>
@@ -276,7 +276,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>380</y>
+       <y>460</y>
        <width>131</width>
        <height>23</height>
       </rect>
@@ -433,9 +433,9 @@
      <property name="geometry">
       <rect>
        <x>370</x>
-       <y>30</y>
+       <y>10</y>
        <width>481</width>
-       <height>321</height>
+       <height>251</height>
       </rect>
      </property>
     </widget>
@@ -471,14 +471,27 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>270</y>
+       <y>210</y>
        <width>131</width>
-       <height>80</height>
+       <height>81</height>
       </rect>
      </property>
      <property name="title">
       <string>Modo de adquisición</string>
      </property>
+     <widget class="QRadioButton" name="period">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>50</y>
+        <width>91</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Periódico</string>
+      </property>
+     </widget>
      <widget class="QRadioButton" name="manual">
       <property name="geometry">
        <rect>
@@ -495,30 +508,27 @@
        <bool>true</bool>
       </property>
      </widget>
-     <widget class="QRadioButton" name="period">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>50</y>
-        <width>91</width>
-        <height>22</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Periódica</string>
-      </property>
-     </widget>
     </widget>
-    <widget class="QWidget" name="">
+    <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>190</y>
-       <width>141</width>
+       <y>350</y>
+       <width>131</width>
        <height>48</height>
       </rect>
      </property>
      <layout class="QGridLayout" name="gridLayout_4">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Promediado</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="0">
        <widget class="QComboBox" name="factor">
         <item>
@@ -558,24 +568,14 @@
         </item>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Promediado</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-      </item>
      </layout>
     </widget>
-    <widget class="QWidget" name="">
+    <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
       <rect>
-       <x>210</x>
-       <y>200</y>
-       <width>151</width>
+       <x>200</x>
+       <y>210</y>
+       <width>141</width>
        <height>211</height>
       </rect>
      </property>
@@ -626,6 +626,16 @@ entre 1 Hz y 4Khz</string>
        </widget>
       </item>
      </layout>
+    </widget>
+    <widget class="QwtPlot" name="graficaADC_2">
+     <property name="geometry">
+      <rect>
+       <x>370</x>
+       <y>270</y>
+       <width>481</width>
+       <height>251</height>
+      </rect>
+     </property>
     </widget>
    </widget>
    <widget class="QWidget" name="tab_3">
@@ -680,7 +690,7 @@ entre 1 Hz y 4Khz</string>
    <property name="geometry">
     <rect>
      <x>0</x>
-     <y>510</y>
+     <y>610</y>
      <width>691</width>
      <height>23</height>
     </rect>

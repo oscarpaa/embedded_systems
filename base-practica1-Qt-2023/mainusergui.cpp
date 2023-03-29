@@ -43,8 +43,8 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     ventanaPopUp.setWindowTitle(tr("Evento"));
     ventanaPopUp.setParent(this,Qt::Popup);
 
-    // --- Inicializo Grafica ADC ---
-    ui->graficaADC->setTitle("Canales ADC");;
+    // Inicializo Grafica ADC unipolar
+    ui->graficaADC->setTitle("Canales ADC unipolar");;
     ui->graficaADC->setAxisTitle(QwtPlot::xBottom, "Tiempo");
     ui->graficaADC->setAxisTitle(QwtPlot::yLeft, "Voltaje");
     ui->graficaADC->setAxisScale(QwtPlot::yLeft, 0, 3.3);
@@ -52,42 +52,79 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
 
     // Formateo de la curva
     for(int i = 0; i < 6; i++){
-        Channels[i] = new QwtPlotCurve();
-        Channels[i]->attach(ui->graficaADC);
+        g1Channels[i] = new QwtPlotCurve();
+        g1Channels[i]->attach(ui->graficaADC);
     }
 
     //Inicializacion de los valores básicos
     for(int i = 0; i < 1024; i++){
-        xVal[i]=i;
+        g1xVal[i]=i;
         for (int j = 0; j < 6; j++) {
-            yVal[j][i] = 0;
+            g1yVal[j][i] = 0;
         }
     }
     for (int i = 0; i < 6; i++) {
-        Channels[i]->setRawSamples(xVal,yVal[i],1024);
+        g1Channels[i]->setRawSamples(g1xVal,g1yVal[i],1024);
     }
 
-    Channels[0]->setPen(QPen(Qt::red)); // Color de la curva
-    Channels[1]->setPen(QPen(Qt::green));
-    Channels[2]->setPen(QPen(Qt::blue));
-    Channels[3]->setPen(QPen(Qt::cyan));
-    Channels[4]->setPen(QPen(Qt::magenta));
-    Channels[5]->setPen(QPen(Qt::yellow));
+    g1Channels[0]->setPen(QPen(Qt::red)); // Color de la curva
+    g1Channels[1]->setPen(QPen(Qt::green));
+    g1Channels[2]->setPen(QPen(Qt::blue));
+    g1Channels[3]->setPen(QPen(Qt::cyan));
+    g1Channels[4]->setPen(QPen(Qt::magenta));
+    g1Channels[5]->setPen(QPen(Qt::yellow));
 
-    m_Grid = new QwtPlotGrid();     // Rejilla de puntos
-    m_Grid->attach(ui->graficaADC);    // que se asocia al objeto QwtPl
+    g1m_Grid = new QwtPlotGrid();     // Rejilla de puntos
+    g1m_Grid->attach(ui->graficaADC);    // que se asocia al objeto QwtPl
     ui->graficaADC->setAutoReplot(false); //Desactiva el autoreplot (mejora la eficiencia)
-    // --- Inicializo Grafica ADC ---
+    // Fin Grafica ADC unipolar
+
+    // Inicializo Grafica ADC diferencial
+    ui->graficaADC_2->setTitle("Canales ADC diferencial");;
+    ui->graficaADC_2->setAxisTitle(QwtPlot::xBottom, "Tiempo");
+    ui->graficaADC_2->setAxisTitle(QwtPlot::yLeft, "Voltaje");
+    ui->graficaADC_2->setAxisScale(QwtPlot::yLeft, 0, 3.3);
+    ui->graficaADC_2->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
+
+    // Formateo de la curva
+    for(int i = 0; i < 3; i++){
+        g2Channels[i] = new QwtPlotCurve();
+        g2Channels[i]->attach(ui->graficaADC_2);
+    }
+
+    //Inicializacion de los valores básicos
+    for(int i = 0; i < 1024; i++){
+        g2xVal[i]=i;
+        for (int j = 0; j < 3; j++) {
+            g2yVal[j][i] = 0;
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        g2Channels[i]->setRawSamples(g2xVal,g2yVal[i],1024);
+    }
+
+    g2Channels[0]->setPen(QPen(Qt::red)); // Color de la curva
+    g2Channels[1]->setPen(QPen(Qt::green));
+    g2Channels[2]->setPen(QPen(Qt::blue));
+
+    g2m_Grid = new QwtPlotGrid();     // Rejilla de puntos
+    g2m_Grid->attach(ui->graficaADC_2);    // que se asocia al objeto QwtPl
+    ui->graficaADC_2->setAutoReplot(false); //Desactiva el autoreplot (mejora la eficiencia)
+    // Fin Grafica ADC diferencial
 
     //Conexion de signals de los widgets del interfaz con slots propios de este objeto
     connect(ui->rojo,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
     connect(ui->verde,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
     connect(ui->azul,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
 
-    connect(ui->gpio,SIGNAL(toggled(bool)),this,SLOT(cambiaMODO()));
-    connect(ui->sondeo,SIGNAL(toggled(bool)),this,SLOT(modoSwitches()));
-    connect(ui->estado,SIGNAL(clicked(bool)),this,SLOT(leeSwitches()));
-    connect(ui->manual,SIGNAL(toggled(bool)),this,SLOT(modoAdquisicion()));
+    connect(ui->gpio,SIGNAL(clicked(bool)),this,SLOT(cambiaMODO()));
+    connect(ui->pwm,SIGNAL(clicked(bool)),this,SLOT(cambiaMODO()));
+
+    connect(ui->sondeo,SIGNAL(clicked(bool)),this,SLOT(modoSwitches()));
+    connect(ui->interrupt,SIGNAL(clicked(bool)),this,SLOT(modoSwitches()));
+
+    connect(ui->manual,SIGNAL(clicked(bool)),this,SLOT(modoAdquisicion()));
+    connect(ui->period,SIGNAL(clicked(bool)),this,SLOT(modoAdquisicion()));
 
     //Conectamos Slots del objeto "Tiva" con Slots de nuestra aplicacion (o con widgets)
     connect(&tiva,SIGNAL(statusChanged(int,QString)),this,SLOT(tivaStatusChanged(int,QString)));
@@ -155,41 +192,55 @@ void MainUserGUI::on_Knob_valueChanged(double value)
 
 void MainUserGUI::on_frecuencia_valueChanged(double value)
 {
-    MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
+    MESSAGE_ADC_AUTO_PARAMETER parameter;
+
     if (ui->period->isChecked())
     {
-        parameter.frecuency = value * pow(10,ui->multiplica->currentIndex());
+        ui->ADCButton->setHidden(true);
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
 
-        tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+        tiva.sendMessage(MESSAGE_ADC_AUTO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
 }
 
 
 void MainUserGUI::on_multiplica_currentIndexChanged(int index)
 {
-    MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
+    MESSAGE_ADC_AUTO_PARAMETER parameter;
+
+    if (index == 3)
+    {
+        ui->frecuencia->setScale(1,4);
+    }
+    else
+    {
+        ui->frecuencia->setScale(1,10);
+    }
+
     if (ui->period->isChecked())
     {
-        parameter.frecuency = (ui->frecuencia->value()) * pow(10,index);
+        ui->ADCButton->setHidden(true);
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
 
-        tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+        tiva.sendMessage(MESSAGE_ADC_AUTO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
 }
 
 void MainUserGUI::modoAdquisicion()
 {
-    MESSAGE_ADC_AUTO_ENABLE_PARAMETER parameter;
+   MESSAGE_ADC_AUTO_PARAMETER parameter;
+
     if (ui->manual->isChecked())
     {
         ui->ADCButton->setHidden(false);
         tiva.sendMessage(MESSAGE_ADC_AUTO_DISABLE,NULL,0);
     }
-    else
+    else if (ui->period->isChecked())
     {
         ui->ADCButton->setHidden(true);
         parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
 
-        tiva.sendMessage(MESSAGE_ADC_AUTO_ENABLE,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+        tiva.sendMessage(MESSAGE_ADC_AUTO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
 }
 
@@ -217,7 +268,7 @@ void MainUserGUI::modoSwitches()
     }
 }
 
-void MainUserGUI::leeSwitches()
+void MainUserGUI::on_estado_clicked()
 {
     tiva.sendMessage(MESSAGE_SWITCHES_POLL,NULL,0);
 }
@@ -332,13 +383,13 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
                 //Recalcula los valores de la grafica
                 for (int i = 1023; i >= 16; --i) {
                     for (int j = 0; j < 6; ++j) {
-                        yVal[j][i] = yVal[j][i-16];
+                        g1yVal[j][i] = g1yVal[j][i-16];
                     }
                 }
 
                 for (int i = 0; i < 16; ++i) {
                     for (int j = 0; j < 6; ++j) {
-                         yVal[j][i] = (((double)parametro.chan[j][i])*3.3/4096.0);
+                         g1yVal[j][i] = (((double)parametro.chan[j][i])*3.3/4096.0);
                     }
                 }
 
@@ -350,6 +401,34 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
             }
         }
         break;
+
+    case MESSAGE_ADC_AUTO_SAMPLE32:
+    {
+        MESSAGE_ADC_AUTO_SAMPLE32_PARAMETER parametro;
+
+        if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+        {
+            //Recalcula los valores de la grafica
+            for (int i = 1023; i >= 32; --i) {
+                for (int j = 0; j < 3; ++j) {
+                    g2yVal[j][i] = g2yVal[j][i-32];
+                }
+            }
+
+            for (int i = 0; i < 32; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                     g2yVal[j][i] = (((double)parametro.chan[j][i])*3.3/4096.0);
+                }
+            }
+
+            ui->graficaADC_2->replot(); //Refresca la grafica una vez actualizados los valores
+        }
+        else
+        {
+            ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
+        }
+    }
+    break;
 
         case MESSAGE_SWITCHES_POLL:
         {

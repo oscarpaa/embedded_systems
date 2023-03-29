@@ -26,7 +26,6 @@ private slots:
     void cambiaLEDs();
     void cambiaMODO();
     void modoSwitches();
-    void leeSwitches();
     void modoAdquisicion();
     void tivaStatusChanged(int status,QString message);
     void messageReceived(uint8_t type, QByteArray datos);
@@ -42,6 +41,7 @@ private slots:
     void on_factor_currentIndexChanged(int index);
     void on_frecuencia_valueChanged(double value);
     void on_multiplica_currentIndexChanged(int index);
+    void on_estado_clicked();
 
 private:
     // funciones privadas
@@ -55,10 +55,17 @@ private:
     QMessageBox ventanaPopUp;
     TivaRemoteLink tiva; //Objeto para gestionar la comunicacion de mensajes con el microcontrolador
 
-    double xVal[1024]; //valores eje X
-    double yVal[6][1024]; //valores ejes Y
-    QwtPlotCurve *Channels[6]; //Curvas
-    QwtPlotGrid  *m_Grid; //Cuadricula
+    // Grafica ADC unipolar
+    double g1xVal[1024]; //valores eje X
+    double g1yVal[6][1024]; //valores ejes Y
+    QwtPlotCurve *g1Channels[6]; //Curvas
+    QwtPlotGrid  *g1m_Grid; //Cuadricula
+
+    // Grafica ADC diferencial
+    double g2xVal[1024]; //valores eje X
+    double g2yVal[3][1024]; //valores ejes Y
+    QwtPlotCurve *g2Channels[3]; //Curvas
+    QwtPlotGrid  *g2m_Grid; //Cuadricula
 };
 
 #endif // GUIPANEL_H

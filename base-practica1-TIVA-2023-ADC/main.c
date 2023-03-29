@@ -25,6 +25,7 @@
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
+#include "event_groups.h"
 #include "utils/cpu_usage.h"
 
 #include "drivers/rgb.h"
@@ -34,19 +35,19 @@
 #include <remotelink.h>
 #include <serialprotocol.h>
 
-#include "drivers/Eventos.h"
-
-
 //parametros de funcionamiento de la tareas
 #define REMOTELINK_TASK_STACK (512)
 #define REMOTELINK_TASK_PRIORITY (tskIDLE_PRIORITY+2)
 #define COMMAND_TASK_STACK (512)
 #define COMMAND_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 
-#define ESTADOS_TASK_STACK (256)
-#define ESTADOS_TASK_PRIORITY (tskIDLE_PRIORITY+1)
+#define STATES_TASK_STACK (256)
+#define STATES_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 #define EVENTS_TASK_STACK (512)
 #define EVENTS_TASK_PRIORITY (tskIDLE_PRIORITY+1)
+
+#define EVENT_ADC_MANUAL (1<<0)            // 1
+#define EVENT_ADC_AUTO (1<<1)              // 2
 
 //Globales
 uint32_t g_ui32CPUUsage;
@@ -54,7 +55,7 @@ uint32_t g_ulSystemClock;
 
 static QueueHandle_t cola_estados;
 static TaskHandle_t tarea_eventos;
-EventGroupHandle_t grupo_eventos;
+static EventGroupHandle_t grupo_eventos;
 
 //*****************************************************************************
 //
@@ -142,49 +143,71 @@ static portTASK_FUNCTION(EVENTSTask,pvParameters)
 {
     EventBits_t eventos;
 
-    MuestrasADC muestras;
+    MuestrasADC adc_muestras;
     MESSAGE_ADC_SAMPLE_PARAMETER adc_manual;
 
-    MESSAGE_ADC_AUTO_SAMPLE16_PARAMETER adc_periodico;
+    MuestrasADC1 adc1_muestras;
 
-    uint8_t cont = 0;
+    MESSAGE_ADC_AUTO_SAMPLE16_PARAMETER adc_uni;
+    MESSAGE_ADC_AUTO_SAMPLE32_PARAMETER adc_diff;
+
+    uint8_t cont_uni = 0;
+    uint8_t cont_diff = 0;
 
     while(1)
     {
-        eventos = xEventGroupWaitBits(grupo_eventos, EVENTO_ADC_MANUAL|EVENTO_ADC_PERIODICO, pdFALSE, pdFALSE, portMAX_DELAY);
+        eventos = xEventGroupWaitBits(grupo_eventos, EVENT_ADC_MANUAL|EVENT_ADC_AUTO, pdFALSE, pdFALSE, portMAX_DELAY);
 
-        if (eventos & EVENTO_ADC_MANUAL)
+        if (eventos & EVENT_ADC_MANUAL)
         {
-            configADC_LeeADC(&muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
+            configADC_LeeADC0(&adc_muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
 
             //Copia los datos en el parametro (es un poco redundante)
             uint8_t i;
             for (i = 0; i < 7; ++i) {
-                adc_manual.chan[i] = muestras.chan[i];
+                adc_manual.chan[i] = adc_muestras.chan[i];
             }
 
             //Encia el mensaje hacia QT
             remotelink_sendMessage(MESSAGE_ADC_SAMPLE,(void *)&adc_manual,sizeof(adc_manual));
         }
-        else if (eventos & EVENTO_ADC_PERIODICO)
+        else if (eventos & EVENT_ADC_AUTO)
         {
-            configADC_LeeADC(&muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
+            configADC_LeeADC0(&adc_muestras);    //Espera y lee muestras del ADC (BLOQUEANTE)
 
             //Copia los datos en el parametro (es un poco redundante)
             uint8_t i;
             for (i = 0; i < 6; ++i) {
-                adc_periodico.chan[i][cont] = muestras.chan[i];
+                adc_uni.chan[i][cont_uni] = adc_muestras.chan[i];
             }
 
-            if (cont == 15)
+            if (cont_uni == 15)
             {
-                cont = 0;
+                cont_uni = 0;
                 //Encia el mensaje hacia QT
-                remotelink_sendMessage(MESSAGE_ADC_AUTO_SAMPLE16,(void *)&adc_periodico,sizeof(adc_periodico));
+                remotelink_sendMessage(MESSAGE_ADC_AUTO_SAMPLE16,(void *)&adc_uni,sizeof(adc_uni));
             }
             else
             {
-                cont++;
+                cont_uni++;
+            }
+
+            configADC_LeeADC1(&adc1_muestras);
+
+            //Copia los datos en el parametro (es un poco redundante)
+            for (i = 0; i < 3; ++i) {
+                adc_diff.chan[i][cont_diff] = adc1_muestras.chan[i];
+            }
+
+            if (cont_diff == 31)
+            {
+                cont_diff = 0;
+                //Encia el mensaje hacia QT
+                remotelink_sendMessage(MESSAGE_ADC_AUTO_SAMPLE32,(void *)&adc_diff,sizeof(adc_diff));
+            }
+            else
+            {
+                cont_diff++;
             }
         }
     }
@@ -234,7 +257,7 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
         break;
         case MESSAGE_ADC_SAMPLE:
         {
-            xEventGroupSetBits(grupo_eventos,EVENTO_ADC_MANUAL);
+            xEventGroupSetBits(grupo_eventos,EVENT_ADC_MANUAL);
             configADC_DisparaADC(); //Dispara la conversion (por software)
         }
         break;
@@ -315,9 +338,9 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
         break;
         case MESSAGE_ADC_AUTO_DISABLE:
         {
-            xEventGroupClearBits(grupo_eventos,EVENTO_ADC_PERIODICO);
+            xEventGroupClearBits(grupo_eventos,EVENT_ADC_AUTO);
 
-            configADC_Mode(ADC_STATE_MANUAL,0);
+            configADC_Mode(MODE_ADC_MANUAL,0);
             vTaskDelete(tarea_eventos);
             if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
             {
@@ -325,33 +348,22 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
             }
         }
         break;
-        case MESSAGE_ADC_AUTO_ENABLE:
+        case MESSAGE_ADC_AUTO:
         {
-            MESSAGE_ADC_AUTO_ENABLE_PARAMETER parametro;
+            MESSAGE_ADC_AUTO_PARAMETER parametro;
             if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
             {
-                xEventGroupClearBits(grupo_eventos,EVENTO_ADC_MANUAL);
-                xEventGroupSetBits(grupo_eventos, EVENTO_ADC_PERIODICO);
+                xEventGroupClearBits(grupo_eventos,EVENT_ADC_MANUAL);
+                xEventGroupSetBits(grupo_eventos, EVENT_ADC_AUTO);
 
-                configADC_Mode(ADC_STATE_AUTO,parametro.frecuency);
+                configADC_Mode(MODE_ADC_AUTO,parametro.frecuency);
+
+                /////////////////7
                 vTaskDelete(tarea_eventos);
                 if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
                 {
                     while(1);
                 }
-            }
-            else
-            {
-                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
-            }
-        }
-        break;
-        case MESSAGE_ADC_AUTO_FRECUENCY:
-        {
-            MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parametro;
-            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
-            {
-                configADC_Mode(ADC_STATE_CHANGE_FREC,parametro.frecuency);
             }
             else
             {
@@ -442,10 +454,11 @@ int main(void)
 
 
 	//Para especificacion 2: Inicializa el ADC y crea una tarea...
-	configADC_IniciaADC();
+	configADC_IniciaADC0();
+	configADC_IniciaADC1();
 
     // Control asíncrono mediante eventos de entradas digitales
-    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"ESTADO INT", ESTADOS_TASK_STACK,NULL,ESTADOS_TASK_PRIORITY, NULL) != pdTRUE))
+    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"ESTADO INT", STATES_TASK_STACK,NULL,STATES_TASK_PRIORITY, NULL) != pdTRUE))
     {
         while(1);
     }
