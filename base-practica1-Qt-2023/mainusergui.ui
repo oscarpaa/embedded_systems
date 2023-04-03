@@ -530,7 +530,7 @@
        </widget>
       </item>
       <item row="1" column="0">
-       <widget class="QComboBox" name="factor">
+       <widget class="QComboBox" name="promedio">
         <item>
          <property name="text">
           <string>0</string>
@@ -602,7 +602,7 @@ entre 1 Hz y 4Khz</string>
        </widget>
       </item>
       <item row="2" column="0">
-       <widget class="QComboBox" name="multiplica">
+       <widget class="QComboBox" name="factor">
         <item>
          <property name="text">
           <string>x1</string>

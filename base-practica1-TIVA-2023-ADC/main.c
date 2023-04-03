@@ -358,12 +358,24 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
 
                 configADC_Mode(MODE_ADC_AUTO,parametro.frecuency);
 
-                /////////////////7
                 vTaskDelete(tarea_eventos);
                 if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
                 {
                     while(1);
                 }
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_ADC_AUTO_FRECUENCY:
+        {
+            MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                configADC_Mode(MODE_ADC_AUTO,parametro.frecuency);
             }
             else
             {

@@ -38,15 +38,17 @@ private slots:
     void on_Knob_valueChanged(double value);
     void on_ADCButton_clicked();
     void on_pingButton_clicked();
-    void on_factor_currentIndexChanged(int index);
+    void on_promedio_currentIndexChanged(int index);
     void on_frecuencia_valueChanged(double value);
-    void on_multiplica_currentIndexChanged(int index);
+    void on_factor_currentIndexChanged(int index);
     void on_estado_clicked();
 
 private:
     // funciones privadas
     void processError(const QString &s);
     void activateRunButton();
+
+    void set_max_oversample();
 
 private:
     //Componentes privados

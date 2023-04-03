@@ -55,15 +55,6 @@ void configADC_Mode(uint8_t mode, uint32_t frecuency)
             ADCSequenceConfigure(ADC0_BASE,0,ADC_TRIGGER_TIMER,0);
         }
         break;
-//        case MODE_ADC_AUTO_DIFF:
-//        {
-//            TimerControlTrigger(TIMER2_BASE, TIMER_A, true); // TIMER1,0 -> RGB, CPUUsage -> TIMER3
-//
-//            //Cargar el valor que contará el temporizador
-//            TimerLoadSet(TIMER2_BASE, TIMER_A, SysCtlClockGet()/frecuency);
-//            TimerEnable(TIMER2_BASE, TIMER_A);
-//        }
-//        break;
     }
 }
 

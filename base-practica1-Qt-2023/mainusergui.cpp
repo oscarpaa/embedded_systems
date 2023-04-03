@@ -190,23 +190,80 @@ void MainUserGUI::on_Knob_valueChanged(double value)
     tiva.sendMessage(MESSAGE_LED_PWM_BRIGHTNESS,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
 }
 
-void MainUserGUI::on_frecuencia_valueChanged(double value)
+void MainUserGUI::set_max_oversample()
 {
-    MESSAGE_ADC_AUTO_PARAMETER parameter;
+    bool encontrado = false;
+    int totalItems = ui->promedio->count();
+    int MAX_PRO = totalItems;
 
     if (ui->period->isChecked())
     {
-        ui->ADCButton->setHidden(true);
-        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
+        double t_sample = 1/((ui->frecuencia->value()) * pow(10,ui->factor->currentIndex()));
+        double t_promedio;
 
-        tiva.sendMessage(MESSAGE_ADC_AUTO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+        int i = 0;
+        while (i < 7 && !encontrado)
+        {
+            if (!i)
+            {
+                t_promedio = 8e-6;
+            }
+            else
+            {
+                t_promedio = 8e-6*pow(2,i);
+            }
+
+            if (t_sample < t_promedio)
+            {
+                MAX_PRO = i;
+                encontrado = true;
+            }
+
+            i++;
+        }
+    }
+
+    if (encontrado)
+    {
+        for (int i = totalItems - 1; i >= MAX_PRO ; i--)
+        {
+            ui->promedio->removeItem(i);
+        }
+    }
+    else
+    {
+        for (int i = MAX_PRO; i < 7; i++)
+        {
+            if (i == 0)
+                ui->promedio->addItem(QString::number(i));
+            else
+                ui->promedio->addItem(QString::number(pow(2,i)));
+        }
+    }
+}
+
+void MainUserGUI::on_frecuencia_valueChanged(double value)
+{
+    MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
+
+    set_max_oversample();
+
+    if (ui->period->isChecked())
+    {
+
+        ui->ADCButton->setHidden(true);
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->factor->currentIndex());
+
+        tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
 }
 
 
-void MainUserGUI::on_multiplica_currentIndexChanged(int index)
+void MainUserGUI::on_factor_currentIndexChanged(int index)
 {
-    MESSAGE_ADC_AUTO_PARAMETER parameter;
+    MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
+
+    set_max_oversample();
 
     if (index == 3)
     {
@@ -220,15 +277,17 @@ void MainUserGUI::on_multiplica_currentIndexChanged(int index)
     if (ui->period->isChecked())
     {
         ui->ADCButton->setHidden(true);
-        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->factor->currentIndex());
 
-        tiva.sendMessage(MESSAGE_ADC_AUTO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+        tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
 }
 
 void MainUserGUI::modoAdquisicion()
 {
-   MESSAGE_ADC_AUTO_PARAMETER parameter;
+    MESSAGE_ADC_AUTO_PARAMETER parameter;
+
+    set_max_oversample();
 
     if (ui->manual->isChecked())
     {
@@ -238,7 +297,7 @@ void MainUserGUI::modoAdquisicion()
     else if (ui->period->isChecked())
     {
         ui->ADCButton->setHidden(true);
-        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->multiplica->currentIndex());
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->factor->currentIndex());
 
         tiva.sendMessage(MESSAGE_ADC_AUTO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
@@ -298,7 +357,7 @@ void MainUserGUI::cambiaLEDs(void)
     tiva.sendMessage(MESSAGE_LED_GPIO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
 }
 
-void MainUserGUI::on_factor_currentIndexChanged(int index)
+void MainUserGUI::on_promedio_currentIndexChanged(int index)
 {
     MESSAGE_OVERSAMPLE_PARAMETER parameter;
     if (!index)
