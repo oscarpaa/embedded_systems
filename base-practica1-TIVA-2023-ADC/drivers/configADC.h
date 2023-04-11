@@ -45,6 +45,6 @@ void configADC_LeeADC1(MuestrasADC1 *datos);
 void configADC_IniciaADC1(void);
 
 void configADC_Promedio(uint32_t factor);
-void configADC_Mode(uint8_t mode, uint32_t frecuency);
+void configADC_Mode(uint8_t mode, float frecuency);
 
 #endif /* CONFIGADC_H_ */

@@ -85,11 +85,11 @@ typedef struct {
 } MESSAGE_OVERSAMPLE_PARAMETER;
 
 typedef struct {
-    uint32_t frecuency;
+    float frecuency;
 } MESSAGE_ADC_AUTO_PARAMETER;
 
 typedef struct {
-    uint32_t frecuency;
+    float frecuency;
 } MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER;
 
 typedef struct {

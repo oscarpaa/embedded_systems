@@ -25,15 +25,15 @@ static QueueHandle_t cola_adc1;
 void configADC_DisparaADC(void)
 {
 	ADCProcessorTrigger(ADC0_BASE,0);
-	ADCProcessorTrigger(ADC1_BASE,1);
 }
 
 void configADC_Promedio(uint32_t factor)
 {
     ADCHardwareOversampleConfigure(ADC0_BASE, factor);
+    ADCHardwareOversampleConfigure(ADC1_BASE, factor);
 }
 
-void configADC_Mode(uint8_t mode, uint32_t frecuency)
+void configADC_Mode(uint8_t mode, float frecuency)
 {
     switch (mode) {
         case MODE_ADC_MANUAL:
@@ -99,7 +99,7 @@ void configADC_IniciaADC0(void)
     IntEnable(INT_ADC0SS0);
 
     //Creamos una cola de mensajes para la comunicacion entre la ISR y la tara que llame a configADC_LeeADC(...)
-    cola_adc=xQueueCreate(8,sizeof(MuestrasADC));
+    cola_adc=xQueueCreate(16,sizeof(MuestrasADC));
     if (cola_adc==NULL)
     {
         while(1);
@@ -151,7 +151,7 @@ void configADC_IniciaADC1(void)
     IntEnable(INT_ADC1SS1);
 
     //Creamos una cola de mensajes para la comunicacion entre la ISR y la tara que llame a configADC_LeeADC(...)
-    cola_adc1=xQueueCreate(8,sizeof(MuestrasADC1));
+    cola_adc1=xQueueCreate(32,sizeof(MuestrasADC1));
     if (cola_adc1==NULL)
     {
         while(1);

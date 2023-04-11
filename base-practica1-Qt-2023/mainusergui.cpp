@@ -83,7 +83,7 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     ui->graficaADC_2->setTitle("Canales ADC diferencial");;
     ui->graficaADC_2->setAxisTitle(QwtPlot::xBottom, "Tiempo");
     ui->graficaADC_2->setAxisTitle(QwtPlot::yLeft, "Voltaje");
-    ui->graficaADC_2->setAxisScale(QwtPlot::yLeft, 0, 3.3);
+    ui->graficaADC_2->setAxisScale(QwtPlot::yLeft, -3.3, 3.3);
     ui->graficaADC_2->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
 
     // Formateo de la curva
@@ -252,7 +252,7 @@ void MainUserGUI::on_frecuencia_valueChanged(double value)
     {
 
         ui->ADCButton->setHidden(true);
-        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->factor->currentIndex());
+        parameter.frecuency = value * pow(10,ui->factor->currentIndex());
 
         tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
@@ -263,8 +263,6 @@ void MainUserGUI::on_factor_currentIndexChanged(int index)
 {
     MESSAGE_ADC_AUTO_FRECUENCY_PARAMETER parameter;
 
-    set_max_oversample();
-
     if (index == 3)
     {
         ui->frecuencia->setScale(1,4);
@@ -274,10 +272,12 @@ void MainUserGUI::on_factor_currentIndexChanged(int index)
         ui->frecuencia->setScale(1,10);
     }
 
+    set_max_oversample();
+
     if (ui->period->isChecked())
     {
         ui->ADCButton->setHidden(true);
-        parameter.frecuency = (ui->frecuencia->value()) * pow(10,ui->factor->currentIndex());
+        parameter.frecuency = (ui->frecuencia->value()) * pow(10,index);
 
         tiva.sendMessage(MESSAGE_ADC_AUTO_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
     }
@@ -476,7 +476,7 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
 
             for (int i = 0; i < 32; ++i) {
                 for (int j = 0; j < 3; ++j) {
-                     g2yVal[j][i] = (((double)parametro.chan[j][i])*3.3/4096.0);
+                     g2yVal[j][i] = (((double)parametro.chan[j][i])*2*3.3/4096.0) -3.3;
                 }
             }
 
