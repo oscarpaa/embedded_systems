@@ -198,20 +198,14 @@ void MainUserGUI::set_max_oversample()
 
     if (ui->period->isChecked())
     {
-        double t_sample = 1/((ui->frecuencia->value()) * pow(10,ui->factor->currentIndex()));
+        double t_sample = 1/(6 * (ui->frecuencia->value()) * pow(10,ui->factor->currentIndex()));
         double t_promedio;
 
         int i = 0;
         while (i < 7 && !encontrado)
         {
-            if (!i)
-            {
-                t_promedio = 8e-6;
-            }
-            else
-            {
-                t_promedio = 8e-6*pow(2,i);
-            }
+            t_promedio = 1e-6*pow(2,i);
+
 
             if (t_sample < t_promedio)
             {
