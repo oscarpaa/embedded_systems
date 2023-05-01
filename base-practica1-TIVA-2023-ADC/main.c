@@ -30,6 +30,10 @@
 
 #include "drivers/rgb.h"
 #include "drivers/configADC.h"
+
+#include "drivers/ACME_3416.h"
+#include "drivers/BMI160.h"
+
 #include "commands.h"
 
 #include <remotelink.h>
@@ -45,6 +49,8 @@
 #define STATES_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 #define EVENTS_TASK_STACK (512)
 #define EVENTS_TASK_PRIORITY (tskIDLE_PRIORITY+1)
+#define ACME_TASK_STACK (256)
+#define ACME_TASK_PRIORITY (tskIDLE_PRIORITY+1)
 
 #define EVENT_ADC_MANUAL (1<<0)            // 1
 #define EVENT_ADC_AUTO (1<<1)              // 2
@@ -56,6 +62,9 @@ uint32_t g_ulSystemClock;
 static QueueHandle_t cola_estados;
 static TaskHandle_t tarea_eventos;
 static EventGroupHandle_t grupo_eventos;
+static SemaphoreHandle_t sem_espera_ACME;
+
+static TimerHandle_t timer_BMI;
 
 //*****************************************************************************
 //
@@ -69,7 +78,8 @@ static EventGroupHandle_t grupo_eventos;
 #ifdef DEBUG
 void __error__(char *nombrefich, uint32_t linea)
 {
-    while(1) //Si la ejecucion esta aqui dentro, es que el RTOS o alguna de las bibliotecas de perifericos han comprobado que hay un error
+    volatile int i = 1;
+    while(i) //Si la ejecucion esta aqui dentro, es que el RTOS o alguna de las bibliotecas de perifericos han comprobado que hay un error
     { //Mira el arbol de llamadas en el depurador y los valores de nombrefich y linea para encontrar posibles pistas.
     }
 }
@@ -211,6 +221,39 @@ static portTASK_FUNCTION(EVENTSTask,pvParameters)
             }
         }
     }
+}
+
+static portTASK_FUNCTION(ACMETask,pvParameters)
+{
+    MESSAGE_ACME_PARAMETER estado_pines;
+
+    //uint8_t state;
+
+    while(1)
+    {
+        // Cogemos el semaforo cuando se ha producido una interrupcion del pin PA3
+        xSemaphoreTake(sem_espera_ACME, portMAX_DELAY);
+
+        //ACME_readInt(&state);
+
+        ACME_readPin(&estado_pines.GPIO);
+        estado_pines.GPIO = ~estado_pines.GPIO;
+
+        int32_t status = remotelink_sendMessage(MESSAGE_ACME, (void *)&estado_pines, sizeof(estado_pines));
+
+        // Borramos los flags de todos los GPIO
+        ACME_clearInt(0xFF);
+    }
+}
+
+/*  CALLBACK del timer software para el BMI */
+void TIMERCallback(TimerHandle_t pxTimer)
+{
+    MESSAGE_BMI_SAMPLE_PARAMETER medidas_BMI;
+    BMI160_getAcceleration(&medidas_BMI.acc[0], &medidas_BMI.acc[1], &medidas_BMI.acc[2]);
+    BMI160_getRotation(&medidas_BMI.gyro[0], &medidas_BMI.gyro[1], &medidas_BMI.gyro[2]);
+
+    remotelink_sendMessage(MESSAGE_BMI_SAMPLE, (void *)&medidas_BMI, sizeof(medidas_BMI));
 }
 
 
@@ -383,6 +426,95 @@ static int32_t messageReceived(uint8_t message_type, void *parameters, int32_t p
             }
         }
         break;
+        case MESSAGE_ACME:
+        {
+            MESSAGE_ACME_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                ACME_writePin(parametro.GPIO);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_BMI_ENABLE:
+        {
+            MESSAGE_BMI_ENABLE_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                xTimerChangePeriod(timer_BMI,configTICK_RATE_HZ/parametro.frecuencia,0);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_BMI_DISABLE:
+        {
+            xTimerStop(timer_BMI,0);
+        }
+        break;
+        case MESSAGE_BMI_FRECUENCY:
+        {
+            MESSAGE_BMI_FRECUENCY_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                if(xTimerIsTimerActive(timer_BMI))
+                {
+                    xTimerChangePeriod(timer_BMI,configTICK_RATE_HZ/parametro.frecuencia,0);
+                }
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_BMI_RANGE_ACC:
+        {
+            MESSAGE_BMI_RANGE_ACC_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                if (parametro.range_acc == 2)
+                    BMI160_setFullScaleAccelRange(BMI160_ACCEL_RANGE_2G);
+                else if (parametro.range_acc == 4)
+                    BMI160_setFullScaleAccelRange(BMI160_ACCEL_RANGE_4G);
+                else if (parametro.range_acc == 8)
+                    BMI160_setFullScaleAccelRange(BMI160_ACCEL_RANGE_8G);
+                else if (parametro.range_acc == 16)
+                    BMI160_setFullScaleAccelRange(BMI160_ACCEL_RANGE_16G);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
+        case MESSAGE_BMI_RANGE_GYRO:
+        {
+            MESSAGE_BMI_RANGE_GYRO_PARAMETER parametro;
+            if (check_and_extract_command_param(parameters, parameterSize, &parametro, sizeof(parametro))>0)
+            {
+                if (parametro.range_gyro == 2000)
+                    BMI160_setFullScaleGyroRange(BMI160_GYRO_RANGE_2000);
+                else if (parametro.range_gyro == 1000)
+                    BMI160_setFullScaleGyroRange(BMI160_GYRO_RANGE_1000);
+                else if (parametro.range_gyro == 500)
+                    BMI160_setFullScaleGyroRange(BMI160_GYRO_RANGE_500);
+                else if (parametro.range_gyro == 250)
+                    BMI160_setFullScaleGyroRange(BMI160_GYRO_RANGE_250);
+                else if (parametro.range_gyro == 125)
+                    BMI160_setFullScaleGyroRange(BMI160_GYRO_RANGE_125);
+            }
+            else
+            {
+                status=PROT_ERROR_INCORRECT_PARAM_SIZE; //Devuelve un error
+            }
+        }
+        break;
 
        default:
            //mensaje desconocido/no implementado
@@ -438,6 +570,18 @@ int main(void)
     IntPrioritySet(INT_GPIOF,configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_GPIOF);
 
+    // Configuracion del puerto PA3 para las interrupciones del ACME
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOA);
+
+    GPIOPinTypeGPIOInput(GPIO_PORTA_BASE, GPIO_PIN_3);
+
+    // El PA3 esta asociado a la señal de salida /INT que es activa a nivel bajo, el pin /INT
+    // quedará a un nivel bajo (0), volviendo a nivel alto (1) cuando se borren los flags
+    GPIOIntTypeSet(GPIO_PORTA_BASE, GPIO_PIN_3, GPIO_FALLING_EDGE);
+    IntPrioritySet(INT_GPIOA, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    GPIOIntEnable(GPIO_PORTA_BASE, GPIO_PIN_3);
+    IntEnable(INT_GPIOA);
 
     if((grupo_eventos = xEventGroupCreate()) == NULL)
     {
@@ -448,6 +592,11 @@ int main(void)
 	{
 	    while(1);
 	}
+
+	if ((sem_espera_ACME = xSemaphoreCreateBinary()) == NULL)
+    {
+        while(1);
+    }
 
 	/********************************      Creacion de tareas *********************/
 
@@ -470,16 +619,25 @@ int main(void)
 	configADC_IniciaADC1();
 
     // Control asíncrono mediante eventos de entradas digitales
-    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"ESTADO INT", STATES_TASK_STACK,NULL,STATES_TASK_PRIORITY, NULL) != pdTRUE))
+    if((xTaskCreate(STATE_SWITCHESTask, (portCHAR *)"Tarea switches", STATES_TASK_STACK,NULL,STATES_TASK_PRIORITY, NULL) != pdTRUE))
     {
         while(1);
     }
 
-	if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea Eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
+	if((xTaskCreate(EVENTSTask, (portCHAR *)"Tarea eventos", EVENTS_TASK_STACK,NULL,EVENTS_TASK_PRIORITY, &tarea_eventos) != pdTRUE))
     {
         while(1);
     }
 
+	if((xTaskCreate(ACMETask, (portCHAR *)"Tarea ACME", ACME_TASK_STACK,NULL,ACME_TASK_PRIORITY, NULL) != pdTRUE))
+    {
+        while(1);
+    }
+
+	if ((timer_BMI = xTimerCreate("TIMER_BMI", configTICK_RATE_HZ/5, pdTRUE, NULL, TIMERCallback)) == NULL)
+    {
+        while(1);
+    }
 
 	//
 	// Arranca el  scheduler.  Pasamos a ejecutar las tareas que se hayan activado.
@@ -508,4 +666,21 @@ void GPIOFIntHandler(void)
     GPIOIntClear(GPIO_PORTF_BASE,ALL_BUTTONS);
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
+
+// Manejador del pin PA3 para las interrupciones del ACME
+void GPIOAIntHandler(void)
+{
+    BaseType_t higherPriorityTaskWoken = pdFALSE;
+
+    int32_t i32PinStatus = GPIOIntStatus(GPIO_PORTA_BASE, true);
+
+    if(i32PinStatus & GPIO_PIN_3)
+    {
+        xSemaphoreGiveFromISR(sem_espera_ACME, &higherPriorityTaskWoken);
+    }
+
+    GPIOIntClear(GPIO_PORTA_BASE, GPIO_PIN_3);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+}
+
 

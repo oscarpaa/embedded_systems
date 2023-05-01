@@ -29,6 +29,13 @@ typedef enum {
     MESSAGE_ADC_AUTO_DISABLE,
     MESSAGE_ADC_AUTO_SAMPLE16,
     MESSAGE_ADC_AUTO_SAMPLE32,
+    MESSAGE_ACME,
+    MESSAGE_BMI_ENABLE,
+    MESSAGE_BMI_DISABLE,
+    MESSAGE_BMI_SAMPLE,
+    MESSAGE_BMI_FRECUENCY,
+    MESSAGE_BMI_RANGE_ACC,
+    MESSAGE_BMI_RANGE_GYRO,
     //etc, etc...
 } messageTypes;
 
@@ -100,6 +107,30 @@ typedef struct {
     uint16_t chan[3][32];
 } MESSAGE_ADC_AUTO_SAMPLE32_PARAMETER;
 
+typedef struct{
+    uint8_t GPIO;
+} MESSAGE_ACME_PARAMETER;
+
+typedef struct{
+    float frecuencia;
+} MESSAGE_BMI_ENABLE_PARAMETER;
+
+typedef struct{
+    int16_t acc[3];
+    int16_t gyro[3];
+} MESSAGE_BMI_SAMPLE_PARAMETER;
+
+typedef struct{
+    float frecuencia;
+} MESSAGE_BMI_FRECUENCY_PARAMETER;
+
+typedef struct{
+    uint8_t range_acc;
+} MESSAGE_BMI_RANGE_ACC_PARAMETER;
+
+typedef struct{
+    uint16_t range_gyro;
+} MESSAGE_BMI_RANGE_GYRO_PARAMETER;
 
 #pragma pack()  //...Pero solo para los comandos que voy a intercambiar, no para el resto.
 

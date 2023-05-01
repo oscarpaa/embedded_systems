@@ -27,6 +27,7 @@ private slots:
     void cambiaMODO();
     void modoSwitches();
     void modoAdquisicion();
+    void controlACME();
     void tivaStatusChanged(int status,QString message);
     void messageReceived(uint8_t type, QByteArray datos);
 
@@ -42,6 +43,10 @@ private slots:
     void on_frecuencia_valueChanged(double value);
     void on_factor_currentIndexChanged(int index);
     void on_estado_clicked();
+    void on_activar_BMI_toggled(bool checked);
+    void on_frec_BMI_valueChanged(double arg1);
+    void on_rango_acc_currentIndexChanged(int index);
+    void on_rango_giro_currentIndexChanged(int index);
 
 private:
     // funciones privadas
@@ -68,6 +73,25 @@ private:
     double g2yVal[3][1024]; //valores ejes Y
     QwtPlotCurve *g2Channels[3]; //Curvas
     QwtPlotGrid  *g2m_Grid; //Cuadricula
+
+    // Variables graficas ACC
+    //valores eje X
+    double xVal_acc[1024];
+    //valores ejes Y
+    double yVal_acc[3][1024];
+    //Curvas
+    QwtPlotCurve *curva_acc[3];
+
+    // Variables graficas GYRO
+    //valores eje X
+    double xVal_gyro[1024];
+    //valores ejes Y
+    double yVal_gyro[3][1024];
+    //Curvas
+    QwtPlotCurve *curva_gyro[3];
+
+    uint8_t RANGE_ACC;
+    uint16_t RANGE_GYRO;
 };
 
 #endif // GUIPANEL_H

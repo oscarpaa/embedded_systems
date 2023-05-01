@@ -112,6 +112,79 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     ui->graficaADC_2->setAutoReplot(false); //Desactiva el autoreplot (mejora la eficiencia)
     // Fin Grafica ADC diferencial
 
+
+    // Define los rangos
+    RANGE_ACC = 2;
+    RANGE_GYRO = 125;
+
+    // Inicializo Grafica ACC
+    ui->graficaAcc->setTitle("Aceleración");;
+    ui->graficaAcc->setAxisTitle(QwtPlot::xBottom, "Tiempo");
+    ui->graficaAcc->setAxisTitle(QwtPlot::yLeft, "Aceleracion (g)");
+    ui->graficaAcc->setAxisScale(QwtPlot::yLeft, -2, 2);
+    ui->graficaAcc->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
+
+    for(int i = 0; i < 1024; i++)
+    {
+        xVal_acc[i] = i;
+        yVal_acc[0][i] = 0;
+        yVal_acc[1][i] = 0;
+        yVal_acc[2][i] = 0;
+    }
+
+    // Formato de las curvas
+    for(int i = 0; i < 3; i++)
+    {
+        curva_acc[i] = new QwtPlotCurve();
+        curva_acc[i]->attach(ui->graficaAcc);
+
+        // Inicializacion de los datos apuntando a bloques de memoria,  por eficiencia
+        curva_acc[i]->setRawSamples(xVal_acc, yVal_acc[i], 1024);
+    }
+
+    // Colores de las curvas
+    curva_acc[0]->setPen(QPen(Qt::red));
+    curva_acc[1]->setPen(QPen(Qt::green));
+    curva_acc[2]->setPen(QPen(Qt::yellow));
+
+    //Desactiva el autoreplot (mejora la eficiencia)
+    ui->graficaAcc->setAutoReplot(false);
+    // Fin Grafica ACC
+
+    // Inicializo Grafica GYRO
+    ui->graficaGiro->setTitle("Velocidad angular");;
+    ui->graficaGiro->setAxisTitle(QwtPlot::xBottom, "Tiempo");
+    ui->graficaGiro->setAxisTitle(QwtPlot::yLeft, "Velocidad angular (º/s)");
+    ui->graficaGiro->setAxisScale(QwtPlot::yLeft, -125, 125);
+    ui->graficaGiro->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
+
+    for(int i = 0; i < 1024; i++)
+    {
+        xVal_gyro[i] = i;
+        yVal_gyro[0][i] = 0;
+        yVal_gyro[1][i] = 0;
+        yVal_gyro[2][i] = 0;
+    }
+
+    // Formato de las curvas
+    for(int i = 0; i < 3; i++)
+    {
+        curva_gyro[i] = new QwtPlotCurve();
+        curva_gyro[i]->attach(ui->graficaGiro);
+
+        // Inicializacion de los datos apuntando a bloques de memoria,  por eficiencia
+        curva_gyro[i]->setRawSamples(xVal_gyro, yVal_gyro[i], 1024);
+    }
+
+    // Colores de las curvas
+    curva_gyro[0]->setPen(QPen(Qt::red));
+    curva_gyro[1]->setPen(QPen(Qt::green));
+    curva_gyro[2]->setPen(QPen(Qt::yellow));
+
+    //Desactiva el autoreplot (mejora la eficiencia)
+    ui->graficaGiro->setAutoReplot(false);
+    // Fin Grafica GIRO
+
     //Conexion de signals de los widgets del interfaz con slots propios de este objeto
     connect(ui->rojo,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
     connect(ui->verde,SIGNAL(toggled(bool)),this,SLOT(cambiaLEDs()));
@@ -125,6 +198,12 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
 
     connect(ui->manual,SIGNAL(clicked(bool)),this,SLOT(modoAdquisicion()));
     connect(ui->period,SIGNAL(clicked(bool)),this,SLOT(modoAdquisicion()));
+
+    /* Conexiones ACME */
+    connect(ui->GPIO4, SIGNAL(toggled(bool)), this, SLOT(controlACME()));
+    connect(ui->GPIO5, SIGNAL(toggled(bool)), this, SLOT(controlACME()));
+    connect(ui->GPIO6, SIGNAL(toggled(bool)), this, SLOT(controlACME()));
+    connect(ui->GPIO7, SIGNAL(toggled(bool)), this, SLOT(controlACME()));
 
     //Conectamos Slots del objeto "Tiva" con Slots de nuestra aplicacion (o con widgets)
     connect(&tiva,SIGNAL(statusChanged(int,QString)),this,SLOT(tivaStatusChanged(int,QString)));
@@ -366,6 +445,60 @@ void MainUserGUI::on_promedio_currentIndexChanged(int index)
     tiva.sendMessage(MESSAGE_OVERSAMPLE,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
 }
 
+void MainUserGUI::controlACME()
+{
+    MESSAGE_ACME_PARAMETER parameter;
+
+    parameter.GPIO = (ui->GPIO7->isChecked() << 7) | (ui->GPIO6->isChecked() << 6) | (ui->GPIO5->isChecked() << 5) | (ui->GPIO4->isChecked() << 4);
+
+    tiva.sendMessage(MESSAGE_ACME,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+}
+
+void MainUserGUI::on_activar_BMI_toggled(bool checked)
+{
+    MESSAGE_BMI_ENABLE_PARAMETER parameter;
+
+    if (checked)
+    {
+        parameter.frecuencia = ui->frec_BMI->value();
+        tiva.sendMessage(MESSAGE_BMI_ENABLE,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+    }
+    else
+    {
+        tiva.sendMessage(MESSAGE_BMI_DISABLE,NULL,0);
+    }
+}
+
+void MainUserGUI::on_frec_BMI_valueChanged(double arg1)
+{
+    MESSAGE_BMI_FRECUENCY_PARAMETER parameter;
+
+    parameter.frecuencia = arg1;
+    tiva.sendMessage(MESSAGE_BMI_FRECUENCY,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+}
+
+void MainUserGUI::on_rango_acc_currentIndexChanged(int index)
+{
+    MESSAGE_BMI_RANGE_ACC_PARAMETER parameter;
+
+    RANGE_ACC = pow(2,index + 1);
+    parameter.range_acc = RANGE_ACC;
+    ui->graficaAcc->setAxisScale(QwtPlot::yLeft, -RANGE_ACC, RANGE_ACC);
+
+    tiva.sendMessage(MESSAGE_BMI_RANGE_ACC,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+}
+
+void MainUserGUI::on_rango_giro_currentIndexChanged(int index)
+{
+    MESSAGE_BMI_RANGE_GYRO_PARAMETER parameter;
+
+    RANGE_GYRO = 125 * pow(2,index);
+    parameter.range_gyro = RANGE_GYRO;
+    ui->graficaGiro->setAxisScale(QwtPlot::yLeft, -RANGE_GYRO, RANGE_GYRO);
+
+    tiva.sendMessage(MESSAGE_BMI_RANGE_GYRO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
+}
+
 //**** Slot asociado a la recepción de mensajes desde la TIVA ********/
 //Está conectado a una señale generada por el objeto TIVA de clase QTivaRPC (se conecta en el constructor de la ventana, más arriba en este fichero))
 //Se pueden añadir los que casos que quieran para completar la aplicación
@@ -455,33 +588,33 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
         }
         break;
 
-    case MESSAGE_ADC_AUTO_SAMPLE32:
-    {
-        MESSAGE_ADC_AUTO_SAMPLE32_PARAMETER parametro;
-
-        if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+        case MESSAGE_ADC_AUTO_SAMPLE32:
         {
-            //Recalcula los valores de la grafica
-            for (int i = 1023; i >= 32; --i) {
-                for (int j = 0; j < 3; ++j) {
-                    g2yVal[j][i] = g2yVal[j][i-32];
-                }
-            }
+            MESSAGE_ADC_AUTO_SAMPLE32_PARAMETER parametro;
 
-            for (int i = 0; i < 32; ++i) {
-                for (int j = 0; j < 3; ++j) {
-                     g2yVal[j][i] = (((double)parametro.chan[j][i])*2*3.3/4096.0) -3.3;
+            if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+            {
+                //Recalcula los valores de la grafica
+                for (int i = 1023; i >= 32; --i) {
+                    for (int j = 0; j < 3; ++j) {
+                        g2yVal[j][i] = g2yVal[j][i-32];
+                    }
                 }
-            }
 
-            ui->graficaADC_2->replot(); //Refresca la grafica una vez actualizados los valores
+                for (int i = 0; i < 32; ++i) {
+                    for (int j = 0; j < 3; ++j) {
+                         g2yVal[j][i] = (((double)parametro.chan[j][i])*2*3.3/4096.0) -3.3;
+                    }
+                }
+
+                ui->graficaADC_2->replot(); //Refresca la grafica una vez actualizados los valores
+            }
+            else
+            {
+                ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
+            }
         }
-        else
-        {
-            ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
-        }
-    }
-    break;
+        break;
 
         case MESSAGE_SWITCHES_POLL:
         {
@@ -507,6 +640,52 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
             {
                 ui->sw1->setChecked(parametro.sw1);
                 ui->sw2->setChecked(parametro.sw2);
+            }
+            else
+            {
+                ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
+            }
+        }
+        break;
+
+        case MESSAGE_ACME:
+        {
+            MESSAGE_ACME_PARAMETER parametro;
+
+            if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+            {
+                ui->GPIO0->setChecked(parametro.GPIO & (1<<0));
+                ui->GPIO1->setChecked(parametro.GPIO & (1<<1));
+                ui->GPIO2->setChecked(parametro.GPIO & (1<<2));
+                ui->GPIO3->setChecked(parametro.GPIO & (1<<3));
+            }
+            else
+            {
+                ui->statusLabel->setText(tr("Status: MSG %1, recibí %2 B y esperaba %3").arg(message_type).arg(datos.size()).arg(sizeof(parametro)));
+            }
+        }
+        break;
+
+        case MESSAGE_BMI_SAMPLE:
+        {
+            MESSAGE_BMI_SAMPLE_PARAMETER parametro;
+            if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
+            {
+                //Recalcula los valores de la grafica
+                for (int i = 1023; i >= 1; --i) {
+                    for (int j = 0; j < 3; ++j) {
+                        yVal_acc[j][i] = yVal_acc[j][i-1];
+                        yVal_gyro[j][i] = yVal_gyro[j][i-1];
+                    }
+                }
+
+                for (int j = 0; j < 3; ++j) {
+                    yVal_acc[j][0] = (((double)parametro.acc[j])*RANGE_ACC/32768.0);
+                    yVal_gyro[j][0] = (((double)parametro.gyro[j])*RANGE_GYRO/32768.0);
+                }
+
+                ui->graficaAcc->replot(); //Refresca la grafica una vez actualizados los valores
+                ui->graficaGiro->replot(); //Refresca la grafica una vez actualizados los valores
             }
             else
             {
