@@ -76,22 +76,19 @@ private:
 
     // Variables graficas ACC
     //valores eje X
-    double xVal_acc[1024];
+    double xVal_acc[128];
     //valores ejes Y
-    double yVal_acc[3][1024];
+    double yVal_acc[3][128];
     //Curvas
     QwtPlotCurve *curva_acc[3];
 
     // Variables graficas GYRO
     //valores eje X
-    double xVal_gyro[1024];
+    double xVal_gyro[128];
     //valores ejes Y
-    double yVal_gyro[3][1024];
+    double yVal_gyro[3][128];
     //Curvas
     QwtPlotCurve *curva_gyro[3];
-
-    uint8_t RANGE_ACC;
-    uint16_t RANGE_GYRO;
 };
 
 #endif // GUIPANEL_H

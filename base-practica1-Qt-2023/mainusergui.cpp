@@ -112,19 +112,14 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     ui->graficaADC_2->setAutoReplot(false); //Desactiva el autoreplot (mejora la eficiencia)
     // Fin Grafica ADC diferencial
 
-
-    // Define los rangos
-    RANGE_ACC = 2;
-    RANGE_GYRO = 125;
-
     // Inicializo Grafica ACC
     ui->graficaAcc->setTitle("Aceleración");;
     ui->graficaAcc->setAxisTitle(QwtPlot::xBottom, "Tiempo");
     ui->graficaAcc->setAxisTitle(QwtPlot::yLeft, "Aceleracion (g)");
     ui->graficaAcc->setAxisScale(QwtPlot::yLeft, -2, 2);
-    ui->graficaAcc->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
+    ui->graficaAcc->setAxisScale(QwtPlot::xBottom, 0, 128.0);
 
-    for(int i = 0; i < 1024; i++)
+    for(int i = 0; i < 128; i++)
     {
         xVal_acc[i] = i;
         yVal_acc[0][i] = 0;
@@ -139,7 +134,7 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
         curva_acc[i]->attach(ui->graficaAcc);
 
         // Inicializacion de los datos apuntando a bloques de memoria,  por eficiencia
-        curva_acc[i]->setRawSamples(xVal_acc, yVal_acc[i], 1024);
+        curva_acc[i]->setRawSamples(xVal_acc, yVal_acc[i], 128);
     }
 
     // Colores de las curvas
@@ -156,9 +151,9 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
     ui->graficaGiro->setAxisTitle(QwtPlot::xBottom, "Tiempo");
     ui->graficaGiro->setAxisTitle(QwtPlot::yLeft, "Velocidad angular (º/s)");
     ui->graficaGiro->setAxisScale(QwtPlot::yLeft, -125, 125);
-    ui->graficaGiro->setAxisScale(QwtPlot::xBottom, 0, 1024.0);
+    ui->graficaGiro->setAxisScale(QwtPlot::xBottom, 0, 128.0);
 
-    for(int i = 0; i < 1024; i++)
+    for(int i = 0; i < 128; i++)
     {
         xVal_gyro[i] = i;
         yVal_gyro[0][i] = 0;
@@ -173,7 +168,7 @@ MainUserGUI::MainUserGUI(QWidget *parent) :  // Constructor de la clase
         curva_gyro[i]->attach(ui->graficaGiro);
 
         // Inicializacion de los datos apuntando a bloques de memoria,  por eficiencia
-        curva_gyro[i]->setRawSamples(xVal_gyro, yVal_gyro[i], 1024);
+        curva_gyro[i]->setRawSamples(xVal_gyro, yVal_gyro[i], 128);
     }
 
     // Colores de las curvas
@@ -481,9 +476,8 @@ void MainUserGUI::on_rango_acc_currentIndexChanged(int index)
 {
     MESSAGE_BMI_RANGE_ACC_PARAMETER parameter;
 
-    RANGE_ACC = pow(2,index + 1);
-    parameter.range_acc = RANGE_ACC;
-    ui->graficaAcc->setAxisScale(QwtPlot::yLeft, -RANGE_ACC, RANGE_ACC);
+    parameter.range_acc = pow(2,index + 1);
+    ui->graficaAcc->setAxisScale(QwtPlot::yLeft, -parameter.range_acc, parameter.range_acc);
 
     tiva.sendMessage(MESSAGE_BMI_RANGE_ACC,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
 }
@@ -492,9 +486,8 @@ void MainUserGUI::on_rango_giro_currentIndexChanged(int index)
 {
     MESSAGE_BMI_RANGE_GYRO_PARAMETER parameter;
 
-    RANGE_GYRO = 125 * pow(2,index);
-    parameter.range_gyro = RANGE_GYRO;
-    ui->graficaGiro->setAxisScale(QwtPlot::yLeft, -RANGE_GYRO, RANGE_GYRO);
+    parameter.range_gyro = 125 * pow(2,index);
+    ui->graficaGiro->setAxisScale(QwtPlot::yLeft, -parameter.range_gyro, parameter.range_gyro);
 
     tiva.sendMessage(MESSAGE_BMI_RANGE_GYRO,QByteArray::fromRawData((char *)&parameter,sizeof(parameter)));
 }
@@ -671,8 +664,11 @@ void MainUserGUI::messageReceived(uint8_t message_type, QByteArray datos)
             MESSAGE_BMI_SAMPLE_PARAMETER parametro;
             if (check_and_extract_command_param(datos.data(), datos.size(), &parametro, sizeof(parametro))>0)
             {
+                uint8_t RANGE_ACC = pow(2,ui->rango_acc->currentIndex() + 1);
+                uint16_t RANGE_GYRO = 125 * pow(2,ui->rango_giro->currentIndex());
+
                 //Recalcula los valores de la grafica
-                for (int i = 1023; i >= 1; --i) {
+                for (int i = 127; i >= 1; --i) {
                     for (int j = 0; j < 3; ++j) {
                         yVal_acc[j][i] = yVal_acc[j][i-1];
                         yVal_gyro[j][i] = yVal_gyro[j][i-1];

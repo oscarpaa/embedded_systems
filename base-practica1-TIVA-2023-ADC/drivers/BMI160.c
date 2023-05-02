@@ -216,7 +216,10 @@ bool BMI160_testConnection()
  * @see getFullScaleGyroRange()
  */
 void BMI160_setFullScaleGyroRange(uint8_t range) {
+    int16_t gyro[3];
+
     BMI160_reg_write(BMI160_RA_GYRO_RANGE, range);
+    BMI160_getRotation(&gyro[0],&gyro[1],&gyro[2]);
 }
 
 /** Set full-scale accelerometer range.
@@ -225,7 +228,10 @@ void BMI160_setFullScaleGyroRange(uint8_t range) {
  * @see BMI160AccelRange
  */
 void BMI160_setFullScaleAccelRange(uint8_t range) {
+    int16_t acc[3];
+
     BMI160_reg_write(BMI160_RA_ACCEL_RANGE, range);
+    BMI160_getAcceleration(&acc[0],&acc[1],&acc[2]);
 }
 
 
